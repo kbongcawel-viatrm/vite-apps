@@ -1,0 +1,2 @@
+# vite-ide
+vscode + vite
