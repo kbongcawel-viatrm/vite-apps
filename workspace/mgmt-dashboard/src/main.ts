@@ -30,7 +30,7 @@ async function refresh() {
       </h1>
 
       <div class="row"><span>Status</span>${badge(s.state)}</div>
-      <div class="row"><span>/workspace/ide</span><a href="${escapeHtml(s.editorUrl)}" target="_blank" rel="noopener">${escapeHtml(s.editorUrl)}</a></div>
+      <div class="row"><span>ide</span><a href="${escapeHtml(s.editorUrl)}" target="_blank" rel="noopener">${escapeHtml(s.editorUrl)}</a></div>
       ${s.lastError ? `<div class="row error"><span>Error</span><span>${escapeHtml(s.lastError)}</span></div>` : ''}
       ${!s.passwordConfigured ? `<div class="row error"><span>Config</span><span>Set PASSWORD in .env (see .env.example)</span></div>` : ''}
 
