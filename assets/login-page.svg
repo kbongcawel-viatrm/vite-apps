@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="560" viewBox="0 0 760 560" role="img" aria-label="code-server login page mockup">
+  <defs>
+    <linearGradient id="dpage" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1b1035"/><stop offset="55%" stop-color="#2d1b4e"/><stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="dcard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.10"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="dbtn" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7f5af0"/><stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <filter id="dshadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="24" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="dglow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="30" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="760" height="560" fill="url(#dpage)"/>
+  <ellipse cx="140" cy="100" rx="220" ry="140" fill="#7f5af0" opacity="0.35" filter="url(#dglow)"/>
+  <ellipse cx="640" cy="470" rx="240" ry="150" fill="#38bdf8" opacity="0.25" filter="url(#dglow)"/>
+
+  <!-- browser chrome -->
+  <rect x="60" y="48" width="640" height="464" rx="14" fill="#0b1220" stroke="#ffffff" stroke-opacity="0.12" filter="url(#dshadow)"/>
+  <rect x="60" y="48" width="640" height="38" rx="14" fill="#111a2e"/>
+  <rect x="60" y="70" width="640" height="16" fill="#111a2e"/>
+  <circle cx="86" cy="67" r="6" fill="#f87171"/><circle cx="106" cy="67" r="6" fill="#fbbf24"/><circle cx="126" cy="67" r="6" fill="#34d399"/>
+  <rect x="150" y="57" width="420" height="20" rx="10" fill="#0b1220" stroke="#ffffff" stroke-opacity="0.15"/>
+  <text x="166" y="71" font-family="ui-monospace, monospace" font-size="11" fill="#94a3b8">🔒 localhost:8080/login</text>
+
+  <!-- login card -->
+  <rect x="230" y="140" width="300" height="300" rx="18" fill="url(#dcard)" stroke="#ffffff" stroke-opacity="0.18" filter="url(#dshadow)"/>
+
+  <!-- logo mark -->
+  <rect x="340" y="170" width="80" height="56" rx="14" fill="url(#dbtn)"/>
+  <text x="380" y="206" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="26" font-weight="800" fill="#ffffff">&lt;/&gt;</text>
+
+  <text x="380" y="262" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="22" font-weight="700" fill="#f1f5f9">code-server</text>
+  <text x="380" y="284" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#94a3b8">Enter password to continue</text>
+
+  <!-- password field -->
+  <rect x="258" y="308" width="244" height="44" rx="10" fill="#0b1220" stroke="#ffffff" stroke-opacity="0.2"/>
+  <text x="274" y="336" font-family="ui-monospace, monospace" font-size="14" fill="#475569">••••••••••••</text>
+
+  <!-- sign in button -->
+  <rect x="258" y="366" width="244" height="44" rx="10" fill="url(#dbtn)"/>
+  <text x="380" y="393" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="15" font-weight="600" fill="#ffffff">Sign in</text>
+
+  <text x="380" y="436" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#64748b">Protected by hardened edge proxy</text>
+
+  <!-- badges -->
+  <g font-family="ui-monospace, monospace" font-size="12">
+    <rect x="520" y="110" width="140" height="34" rx="17" fill="#10b981" opacity="0.9"/>
+    <text x="590" y="132" text-anchor="middle" fill="#fff">password auth</text>
+    <rect x="500" y="160" width="160" height="34" rx="17" fill="#0ea5e9" opacity="0.9"/>
+    <text x="580" y="182" text-anchor="middle" fill="#fff">CSP + headers</text>
+    <rect x="530" y="210" width="130" height="34" rx="17" fill="#f59e0b" opacity="0.9"/>
+    <text x="595" y="232" text-anchor="middle" fill="#fff">rate limited</text>
+  </g>
+</svg>

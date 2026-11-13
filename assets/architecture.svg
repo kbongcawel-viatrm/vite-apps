@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="320" viewBox="0 0 960 320" role="img" aria-label="Architecture diagram">
+  <defs>
+    <linearGradient id="n1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7f5af0"/><stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+    <linearGradient id="n2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0ea5e9"/><stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+    <linearGradient id="n3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="320" rx="16" fill="#0b1020"/>
+
+  <!-- boxes -->
+  <g font-family="Inter, system-ui, sans-serif">
+    <rect x="40" y="110" width="200" height="100" rx="14" fill="url(#n1)"/>
+    <text x="140" y="152" text-anchor="middle" font-size="20" font-weight="700" fill="#fff">Browser</text>
+    <text x="140" y="178" text-anchor="middle" font-size="13" fill="#ede9fe">UI · Editor · WS</text>
+
+    <rect x="380" y="80" width="200" height="160" rx="14" fill="url(#n2)"/>
+    <text x="480" y="122" text-anchor="middle" font-size="20" font-weight="700" fill="#fff">Edge proxy</text>
+    <text x="480" y="148" text-anchor="middle" font-size="13" fill="#cffafe">:8080</text>
+    <text x="480" y="170" text-anchor="middle" font-size="12" fill="#e0f2fe">CSP · rate limit</text>
+    <text x="480" y="190" text-anchor="middle" font-size="12" fill="#e0f2fe">HTTP + WebSocket</text>
+
+    <rect x="720" y="110" width="200" height="100" rx="14" fill="url(#n3)"/>
+    <text x="820" y="152" text-anchor="middle" font-size="20" font-weight="700" fill="#fff">code-server</text>
+    <text x="820" y="178" text-anchor="middle" font-size="13" fill="#d1fae5">127.0.0.1:18080</text>
+  </g>
+
+  <!-- arrows -->
+  <g stroke="#94a3b8" stroke-width="2.5" fill="none" marker-end="url(#arrow)">
+    <path d="M240 160 H380"/>
+    <path d="M580 160 H720"/>
+  </g>
+  <text x="310" y="148" text-anchor="middle" font-size="12" fill="#94a3b8" font-family="ui-monospace, monospace">:8080</text>
+  <text x="650" y="148" text-anchor="middle" font-size="12" fill="#94a3b8" font-family="ui-monospace, monospace">proxy</text>
+
+  <!-- annotations -->
+  <g font-family="ui-monospace, monospace" font-size="12" fill="#64748b">
+    <text x="480" y="278" text-anchor="middle">never directly reachable — localhost only</text>
+    <text x="480" y="298" text-anchor="middle">CSP · X-Frame-Options: DENY · nosniff · Referrer-Policy: no-referrer</text>
+  </g>
+</svg>
