@@ -27,16 +27,16 @@ const LOGIN_PAGE = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>vite-apps — sign in</title>
 <style>
-  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0f172a;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif}
-  .card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:2rem;width:min(380px,92vw);box-shadow:0 20px 50px rgb(0 0 0/.4)}
-  h1{margin:0;font-size:1.6rem}.sub{margin:.25rem 0 1.5rem;color:#94a3b8}
-  label{display:block;font-size:.85rem;color:#94a3b8;margin-bottom:.35rem}
-  input{width:100%;box-sizing:border-box;padding:.55rem .75rem;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:.95rem}
-  input:focus-visible{outline:2px solid #7dd3fc;outline-offset:1px;border-color:#7dd3fc}
-  button{margin-top:1rem;width:100%;padding:.55rem 1.1rem;border-radius:8px;border:1px solid #0369a1;background:#0369a1;color:#e2e8f0;font-size:.95rem;cursor:pointer}
-  button:hover{border-color:#7dd3fc}
-  .err{color:#fca5a5;font-size:.85rem;min-height:1.2em;margin:.5rem 0 0}
-  .hint{margin-top:1.25rem;font-size:.8rem;color:#64748b}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f2f2f2;color:#1a1a1a;font-family:system-ui,-apple-system,sans-serif}
+  .card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:2rem;width:min(380px,92vw);box-shadow:0 20px 50px rgb(23 54 82/.12)}
+  h1{margin:0;font-size:1.6rem;color:#007acc}.sub{margin:.25rem 0 1.5rem;color:#5b7685}
+  label{display:block;font-size:.85rem;color:#5b7685;margin-bottom:.35rem}
+  input{width:100%;box-sizing:border-box;padding:.55rem .75rem;border-radius:8px;border:1px solid #c2d0e5;background:#fff;color:#3778b7;font-size:.95rem}
+  input:focus-visible{outline:2px solid #d8efff;outline-offset:1px;border-color:#007acc}
+  button{margin-top:1rem;width:100%;padding:.55rem 1.1rem;border-radius:8px;border:1px solid #3778b7;background:#3778b7;color:#e2eeff;font-size:.95rem;cursor:pointer}
+  button:hover{background:#2c6aa0;border-color:#2c6aa0;color:#fff}
+  .err{color:#c62828;font-size:.85rem;min-height:1.2em;margin:.5rem 0 0}
+  .hint{margin-top:1.25rem;font-size:.8rem;color:#9b9b9b}
 </style></head><body>
 <main class="card"><h1>vite-apps</h1><p class="sub">Manager sign in</p>
 <form id="login"><label for="pw">Password</label>
