@@ -37,7 +37,7 @@ async function refresh() {
           ? `<button id="stop" class="danger">Stop</button>`
           : `<button id="start" class="primary">Start code-server</button>`}
         <button id="refresh">Refresh</button>
-        <a class="btn" href="/cdn-cgi/access/logout">Log out</a>
+        <a class="btn" href="https://home-security-xyz.cloudflareaccess.com/cdn-cgi/access/logout">Log out</a>
       </div>
     </main>`
 
