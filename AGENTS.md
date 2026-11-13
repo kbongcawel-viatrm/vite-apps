@@ -18,21 +18,19 @@ approval. When in doubt, ask first.
 
 ## Project layout
 
-- `workspace/mgmt-dashboard/` — Vite + TS management UI (npm workspace)
-- `workspace/ide/` — code-server backend: `server/`, `scripts/`, `deploy/`, `compose.yaml`
-- `.env` at repo root holds secrets (`PASSWORD`, `TUNNEL_TOKEN`, …) — never commit it
-- Root `package.json` scripts delegate: `dev|build|preview` → dashboard, `server|deploy|install:code-server` → ide
+- `workspace/file-manager/` — dufs file-manager image (`Dockerfile`, `entrypoint.sh`, `assets/`); mounts `ftp://192.168.2.1:21` via rclone/FUSE
+- `workspace/ide/deploy/` — edge configs only: `Caddyfile.tunnel`, `cloudflared/config.yml`
+- `compose.yaml` at repo root — unified podman-compose stack (`vite-apps` project): caddy + cloudflared + dufs
+- `.env` at repo root holds secrets (`TUNNEL_TOKEN`) — never commit it; `workspace/file-manager/.env` holds `FTP_USER`/`FTP_PW`
 
 ## Common commands
 
 ```bash
-npm install
-npm run dev          # UI :5173 + edge proxy :8080 + code-server :18080
-npm run build && npm run server   # production mode
-npm run deploy       # build + app + podman-compose up -d (Caddy + cloudflared)
-podman-compose -f workspace/ide/compose.yaml ps|logs|down
+podman-compose -f compose.yaml up -d        # start whole stack (repo root)
+podman-compose -f compose.yaml ps|logs|down
+podman-compose -f compose.yaml up -d|stop|start dufs   # file manager lifecycle
+podman-compose -f compose.yaml up -d --build dufs      # rebuild image
 ```
 
-Public URLs (Cloudflare Tunnel): `https://ide.home-security.uk` (editor),
-`https://manager.home-security.uk` (manager UI) — both gated solely by
-Cloudflare Access SSO; code-server runs `--auth none` on localhost.
+Public URL (Cloudflare Tunnel): `https://files.home-security.uk` — gated by
+Cloudflare Access SSO. No systemd units; everything is compose-managed.

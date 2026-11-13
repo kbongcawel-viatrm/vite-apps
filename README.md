@@ -1,308 +1,89 @@
 <div align="center">
 
-<img src="assets/hero.svg" alt="vite-apps — VS Code in the browser, hardened and proxied" width="100%"/>
+<img src="assets/hero.svg" alt="vite-apps — file manager behind Cloudflare Access" width="100%"/>
 
 # ⚡ vite-apps
 
-**A Vite app that runs [code-server](https://github.com/coder/code-server)** — VS Code in the browser — behind a hardened edge proxy and Cloudflare Access SSO, with a small management UI to start, stop, and monitor it.
-
-[![Node](https://img.shields.io/badge/node-%E2%89%A518-339933?logo=node.js&logoColor=white)](https://nodejs.org)
-[![Vite](https://img.shields.io/badge/vite-8-646cff?logo=vite&logoColor=white)](https://vite.dev)
-[![TypeScript](https://img.shields.io/badge/typescript-7-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-[![Security](https://img.shields.io/badge/security-hardened%20proxy-success)](#security-notes)
+**A dufs file manager over FTP**, exposed publicly through a rootless Podman stack: Caddy + Cloudflare Tunnel + Access SSO.
 
 </div>
 
 ---
 
-## 📖 Table of contents
-
-- [✨ Features](#-features)
-- [🏗️ Architecture](#-architecture)
-- [🚀 Quick start](#-quick-start)
-- [🖥️ Using the manager UI](#-using-the-manager-ui)
-- [⚙️ Configuration](#-configuration)
-- [🌐 Remote access (TLS)](#-remote-access-tls-required)
-- [☁️ Tunnel deploy (Caddy + Cloudflare)](#-tunnel-deploy-caddy--cloudflare)
-- [🏭 Production](#-production)
-- [📜 Logs](#-logs)
-- [🛠️ Troubleshooting](#-troubleshooting)
-- [🔐 Security notes](#-security-notes)
-
----
-
-## ✨ Features
-
-| | |
-|---|---|
-| 🖥️ **Browser IDE** | Full VS Code experience via code-server — no install, works over SSH or on a NAS |
-| 🛡️ **Hardened proxy** | Edge layer adds CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, and login rate limiting |
-| 🔐 **SSO-gated** | Cloudflare Access authenticates before traffic reaches the tunnel; code-server runs `--auth none` on localhost |
-| 📊 **Manager UI** | Tiny Vite dashboard to check status, start/stop the server, and grab the editor link |
-| 🔕 **Privacy-first** | Telemetry and update checks disabled; user data & extensions persist in `.code-server-data/` |
-| 🚢 **One-command prod** | `npm run build && npm run server` — serves `dist/` and manages code-server with no dev server |
-
----
-
 ## 🏗️ Architecture
 
-<img src="assets/architecture.svg" alt="Request flow: browser → edge proxy :8080 → code-server 127.0.0.1:18080" width="100%"/>
-
 ```text
-browser ──> Vite UI (:5173)            management dashboard (status / start / stop)
-browser ──> edge proxy (:8080)         security headers + login rate limit + WS
-              └──> code-server (:18080, 127.0.0.1 only)  the actual editor
+browser ──> Cloudflare edge (Access SSO)
+              └──> cloudflared ──> Caddy :8443 (TLS internal CA, 127.0.0.1 only)
+                                     └── files.home-security.uk -> 127.0.0.1:5050 (dufs container)
 ```
 
-- **code-server** binds to `127.0.0.1:18080` — never directly reachable.
-- The **edge proxy** (same Node process as the Vite plugin) is the only public surface.
-- code-server runs `--auth none` bound to `127.0.0.1` — authentication happens upstream at Cloudflare Access; nothing listens publicly without SSO.
-- Telemetry and update checks are disabled; workspace trust is off; user data and extensions live under `.code-server-data/`.
+- **dufs** runs as container `vite-apps_dufs_1`, publishing `127.0.0.1:5050 → :5000`.
+- Inside the container, `entrypoint.sh` mounts `ftp://192.168.2.1:21` via rclone/FUSE to `/mnt/ftp`, then serves it with dufs.
+- The dufs UI is vendored in `workspace/file-manager/assets/` — Atom-themed, with a Cloudflare Access logout link.
+- All public traffic is gated solely by **Cloudflare Access** — nothing listens on LAN/public interfaces.
 
 ---
 
 ## 📁 Project structure
 
-The repo is split into two segregated projects under `workspace/` — which is
-also the folder code-server opens in the editor:
-
 ```text
 vite-apps/
-├── package.json                  # npm workspaces root + orchestrating scripts
-├── .env / .env.example           # shared secrets & ports (gitignored)
-├── .code-server-data/            # runtime: logs, user data, extensions
+├── compose.yaml                  # podman-compose stack (rootless): caddy + cloudflared + dufs
+├── .env / .env.example           # secrets (gitignored)
 ├── workspace/
-│   ├── mgmt-dashboard/           # 🖥️ Vite + TS management UI
-│   │   ├── package.json          #   own devDeps (vite, typescript)
-│   │   ├── vite.config.ts        #   loads plugin from ../ide/server
-│   │   ├── index.html
-│   │   ├── tsconfig.json
-│   │   └── src/                  #   main.ts, style.css
-│   └── ide/                      # 🔧 code-server backend & ops
-│       ├── server/               #   manager, edge proxy, standalone
-│       ├── scripts/              #   install-code-server.sh, deploy.sh
-│       ├── deploy/               #   Caddyfiles + cloudflared config
-│       ├── compose.yaml          #   podman-compose (rootless, host net)
-│       ├── bin/ + vendor/        #   code-server binary (gitignored)
+│   ├── ide/deploy/               # Caddyfile.tunnel, cloudflared config
+│   └── file-manager/             # dufs image (FTP via rclone)
+│       ├── Dockerfile, entrypoint.sh, assets/
+│       └── .env                  # FTP_USER / FTP_PW (gitignored)
 └── assets/                       # README artwork
 ```
 
-Root scripts delegate into the subprojects: `npm run dev|build|preview`
-→ `workspace/mgmt-dashboard`, `npm run server|deploy|install:code-server`
-→ `workspace/ide`. `CODE_SERVER_WORKSPACE=./workspace` means the editor opens
-the `workspace/` dir itself — i.e. you browse both projects inside the IDE.
-All runtime state (`.env`, `.code-server-data/`) stays at the repo root.
-
 ---
 
-## 🚀 Quick start
+## 🚀 Deploy
 
 ```bash
-npm install
-cp .env.example .env
-npm run dev        # UI on :5173, autostarts code-server
+podman-compose -f compose.yaml up -d        # start the whole stack
+podman-compose -f compose.yaml up -d --build dufs   # rebuild the file manager image
 ```
 
-Then open **<http://localhost:5173>** — the manager dashboard:
+Containers are **rootless only** — run `podman-compose` as your normal user, never with `sudo`.
 
-<p align="center">
-  <img src="assets/manager-ui.svg" alt="vite-apps manager dashboard at localhost:5173 showing status running, editor link, and Start/Stop/Refresh buttons" width="80%"/>
-</p>
-
-1. Check the **Status** badge — it should read `running` (autostarted by `npm run dev`)
-2. Click the **Editor** link, or open <http://localhost:8080> directly
-3. Open <http://localhost:8080> directly — the VS Code workbench loads with no login (auth is handled by Cloudflare Access in production).
-
-<details>
-<summary>📦 Install the code-server binary manually</summary>
-
-The binary is auto-installed to `vendor/code-server` on first start, or run:
-
-```bash
-npm run install:code-server
-```
-
-</details>
-
----
-
-## 🖥️ Using the manager UI
-
-The dashboard at `http://localhost:5173` is served by Vite and talks to the
-same Node process that owns the edge proxy. It polls
-`/api/code-server/status` every 5 seconds.
-
-| Element | What it does |
+| Command | Effect |
 |---|---|
-| **Status badge** | `stopped` · `starting` · `running` · `error` — live state of code-server |
-| **Editor** | Deep link to `PUBLIC_EDITOR_URL` — opens the login page in a new tab |
-| **Start / Stop** | `POST /api/code-server/start` / `/stop` |
-| **Refresh** | Force an immediate status re-fetch |
-| **Sign out** | — removed; sign out via Cloudflare Access instead |
+| `podman-compose -f compose.yaml ps` | Status |
+| `podman-compose -f compose.yaml logs -f dufs` | Follow dufs logs |
+| `podman-compose -f compose.yaml stop dufs` / `start dufs` | Toggle file manager |
+| `podman-compose -f compose.yaml down` | Stop + remove all containers |
 
-The dashboard is intentionally minimal: **Status** and the **Editor** URL
-only. Public access is gated entirely by **Cloudflare Access** (see below);
-the app itself binds to `127.0.0.1` and its management API is reachable only
-from localhost or through the tunnel.
+| URL | What |
+|---|---|
+| `https://files.home-security.uk` | dufs file manager over FTP (Access SSO) |
+| `http://localhost:5050` | same service, local only |
 
 ---
 
 ## ⚙️ Configuration
 
-All settings live in `.env` (see [`.env.example`](.env.example)):
-
 | Variable | Default | Purpose |
 |---|---|---|
-| `VITE_PORT` | `5173` | Management UI port |
-| `EDGE_PORT` / `EDGE_BIND` | `8080` / `127.0.0.1` | Public proxy address |
-| `CODE_SERVER_PORT` | `18080` | Internal code-server port (localhost only) |
-| `CODE_SERVER_WORKSPACE` | `./workspace` | Folder opened in the editor |
-| `PUBLIC_EDITOR_URL` | `http://localhost:8080` | URL shown in the UI |
-| `CODE_SERVER_AUTOSTART` | `1` | Set `0` to disable autostart on `vite dev`/`preview` |
-
----
-
-## 🌐 Remote access (TLS required)
-
-> ⚠️ **Never expose `EDGE_PORT` directly** — it is plain HTTP. Terminate TLS in front of it:
-
-```bash
-caddy run --config workspace/ide/deploy/Caddyfile   # see workspace/ide/deploy/Caddyfile
-```
-
-Then set `PUBLIC_EDITOR_URL=https://ide.example.com` in `.env`.
-
----
-
-## ☁️ Tunnel deploy (Caddy + Cloudflare)
-
-Expose the IDE publicly at **`https://ide.home-security.uk`** without opening
-any inbound ports — `cloudflared` dials *out* to Cloudflare, and TLS is
-terminated automatically at the Cloudflare edge.
-
-```text
-internet ──> Cloudflare edge (TLS, *.home-security.uk)
-              └──> cloudflared ──> 127.0.0.1:8443 (Caddy, TLS internal CA)
-                                     ├── ide.home-security.uk     -> 127.0.0.1:8080 (edge proxy)
-                                     │                              └──> 127.0.0.1:18080 (code-server)
-                                     └── manager.home-security.uk -> 127.0.0.1:5173 (manager UI)
-```
-
-Both containers run with `network_mode: host` so they can reach the
-loopback-bound services — **no new public ports are opened**. Containers
-are **rootless only**: run `podman-compose` as your normal user, never with
-`sudo` (`deploy.sh` enforces this).
-
-### TLS mappings
-
-Every hop is encrypted:
-
-| Hop | TLS |
-|---|---|
-| Browser → Cloudflare edge | Public TLS for `*.home-security.uk` (automatic) |
-| cloudflared → Caddy `127.0.0.1:8443` | Caddy internal CA (`tls internal`), `noTLSVerify` on the tunnel |
-| Caddy → edge proxy `:8080` | loopback HTTP (same host, never leaves the machine) |
-| edge proxy → code-server `:18080` | loopback HTTP |
-
-`workspace/ide/deploy/Caddyfile.tunnel` defines both vhosts (`ide.` and `manager.`),
-each `bind 127.0.0.1` so nothing is exposed on LAN interfaces. To use real
-public certs at Caddy instead (direct DNS, no tunnel), see `workspace/ide/deploy/Caddyfile`.
-
-### One-time Cloudflare setup
-
-```bash
-cloudflared tunnel login
-cloudflared tunnel create vite-apps
-cloudflared tunnel route dns vite-apps ide.home-security.uk
-cloudflared tunnel route dns vite-apps manager.home-security.uk   # manager UI
-mv ~/.cloudflared/<TUNNEL_ID>.json workspace/ide/deploy/cloudflared/credentials.json
-# edit workspace/ide/deploy/cloudflared/config.yml: set `tunnel: <TUNNEL_ID>`
-```
-
-(`credentials.json` is gitignored — it contains the tunnel secret.)
-
-Set `PUBLIC_EDITOR_URL=https://ide.home-security.uk` in `.env` so the
-manager's **Editor** link points at the public URL instead of localhost.
-
-### Deploy
-
-```bash
-npm run deploy        # = build → start app → podman-compose up -d
-# or directly: ./workspace/ide/scripts/deploy.sh [--app-only|--containers]
-#   →  podman-compose -f workspace/ide/compose.yaml up -d   (Caddy + cloudflared)
-```
-
-| Flag | Effect |
-|---|---|
-| `--app-only` | Build + start the app, skip containers |
-| `--containers` | Containers only — app must already be running |
-
-Manage with `podman-compose ps|logs|down`.
-
-| URL | What |
-|---|---|
-| `https://ide.home-security.uk` | code-server editor (Access SSO) |
-| `https://manager.home-security.uk` | manager UI — status/start/stop dashboard |
-| `http://localhost:5173` / `:8080` | same services, local only |
-
-> 🔐 Public access is gated by **Cloudflare Access** (SSO via the
-> `home-security-xyz` team domain — GitHub/Google/OTP, allow-listed emails)
-> before any request reaches the tunnel; sign out from the Access session.
-> code-server runs `--auth none` on `127.0.0.1` — SSO is the only gate.
-> The manager UI/API bind to `127.0.0.1` only — never expose port `5173`
-> or `8080` directly.
-
-### Private hosting (WARP-only)
-
-Yes — Cloudflare Tunnel supports privately hosted apps: instead of a public
-`hostname` ingress rule, route a private CIDR to the tunnel (Zero Trust
-dashboard → Networks → Tunnels → Private Network, or
-`cloudflared tunnel route ip add <CIDR> vite-apps`). Devices enrolled in WARP
-then reach the app at its private IP — **no public hostname at all**. See the
-comments in `workspace/ide/deploy/cloudflared/config.yml`.
-
----
-
-## 🏭 Production
-
-```bash
-npm run build && npm run server   # serves workspace/mgmt-dashboard/dist + manages code-server
-```
-
----
-
-## 📜 Logs
-
-- **Edge/manager logs:** Vite console
-- **code-server logs:** `.code-server-data/logs/code-server.log` (+ `.err.log`)
-
----
-
-## 🛠️ Troubleshooting
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| UI loads on `:5174` (or higher) with an `edge proxy failed: EADDRINUSE` error | A second `npm run dev` auto-incremented the Vite port but can't bind `EDGE_PORT` `8080` — only one instance can own the proxy | Use the lowest port (`:5173`); kill duplicates with `pkill -f "vite"` or `kill <pid>` |
-| Status stuck on `starting` | code-server still booting | Wait a few seconds and hit **Refresh**; check `.code-server-data/logs/code-server.log` |
-| Editor link unreachable | code-server stopped or proxy down | Start it from the manager; verify `EDGE_PORT` isn't firewalled |
-| Port `8080` already in use | Another service holds the edge port | Change `EDGE_PORT` in `.env` and update `PUBLIC_EDITOR_URL` |
-
-To make duplicate dev servers **fail loudly** instead of silently landing on
-`:5174`, add `strictPort: true` under `server` in `workspace/mgmt-dashboard/vite.config.ts`.
+| `TUNNEL_TOKEN` | — | Cloudflare Tunnel token (compose `cloudflared` service, root `.env`) |
+| `FTP_USER` / `FTP_PW` | — | FTP credentials (`workspace/file-manager/.env`) |
+| `FTP_HOST` / `FTP_PORT` | `192.168.2.1` / `21` | Optional FTP endpoint overrides |
 
 ---
 
 ## 🔐 Security notes
 
-- code-server grants **full shell access** to anyone who reaches it — Cloudflare Access is the only gate, so keep the allow policy tight and treat Access sessions like shell access.
-- `.env`, `vendor/`, `.code-server-data/`, `workspace/` are gitignored — **never commit them**.
-- The CSP allows `'unsafe-inline'`/`'unsafe-eval'` because VS Code's web workbench requires them; everything else is locked down (`frame-ancestors 'none'`, `base-uri 'self'`, restrictive `Permissions-Policy`).
+- Public access is gated by **Cloudflare Access** (SSO via the `home-security-xyz` team domain — allow-listed emails) before any request reaches the tunnel.
+- dufs binds inside the container; only `127.0.0.1:5050` is published on the host.
+- `.env` and `workspace/file-manager/.env` are gitignored — **never commit secrets**.
 
 ---
 
 <div align="center">
 
-Made with ❤️ for people who live in the browser.
+Made with ❤️ for self-hosted file access.
 
 </div>

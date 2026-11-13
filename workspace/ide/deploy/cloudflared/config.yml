@@ -3,8 +3,7 @@
 # Prerequisites (one-time, on any machine with `cloudflared` installed):
 #   cloudflared tunnel login                          # browser auth -> cert.pem
 #   cloudflared tunnel create vite-apps                # prints a tunnel UUID
-#   cloudflared tunnel route dns vite-apps ide.home-security.uk
-#   cloudflared tunnel route dns vite-apps manager.home-security.uk
+#   cloudflared tunnel route dns vite-apps files.home-security.uk
 #   cloudflared tunnel token vite-apps > /dev/null     # or copy credentials.json
 #
 # Then place the generated credentials file here:
@@ -23,22 +22,12 @@ tunnel: TUNNEL_ID_PLACEHOLDER
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  # Editor -> Caddy TLS origin (https, internal CA; noTLSVerify required)
-  - hostname: ide.home-security.uk
+  # File manager -> Caddy TLS origin (https, internal CA; noTLSVerify required)
+  - hostname: files.home-security.uk
     service: https://127.0.0.1:8443
     originRequest:
       noTLSVerify: true
-      httpHostHeader: ide.home-security.uk
-
-  # Manager UI -> same Caddy origin, different vhost.
-  # NOTE: /api/code-server/{start,stop} requires the PASSWORD bearer token
-  # (same secret as code-server login). The UI prompts for it once.
-  # For stronger protection put Cloudflare Access in front of this hostname.
-  - hostname: manager.home-security.uk
-    service: https://127.0.0.1:8443
-    originRequest:
-      noTLSVerify: true
-      httpHostHeader: manager.home-security.uk
+      httpHostHeader: files.home-security.uk
 
   # Catch-all: anything else gets a 404
   - service: http_status:404

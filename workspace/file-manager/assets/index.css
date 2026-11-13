@@ -1,0 +1,383 @@
+:root {
+  color-scheme: light;
+  /* Atom (themewagon) palette — matches the mgmt-dashboard theme */
+  --bg-primary: #f4f3f8;
+  --bg-secondary: #eceaf5;
+  --bg-tertiary: #ffffff;
+  --bg-hover: #efeafd;
+  --bg-card: #ffffff;
+  --text-primary: #252425;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --text-accent: #5540af;
+  --svg-primary: #252425;
+  --svg-secondary: rgba(85, 64, 175, 0.55);
+  --svg-tertiary: #6b7280;
+  --border-primary: #e6e5ec;
+  --border-secondary: #d9d6e8;
+  --accent: #5540af;
+  --accent-hover: #4635a0;
+  --accent-soft: #efeafd;
+  --yellow: #f9e71c;
+}
+
+html {
+  font-family: "Open Sans", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  /* prevent premature breadcrumb wrapping on mobile */
+  min-width: 538px;
+  margin: 0;
+  background-color: var(--bg-primary);
+}
+
+svg {
+  fill: var(--svg-primary);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0.6em 1em;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+  box-shadow: 0 1px 3px rgba(37, 36, 37, 0.06);
+}
+
+.breadcrumb {
+  font-family: "Raleway", "Open Sans", sans-serif;
+  font-size: 1.25em;
+  font-weight: 600;
+  padding-right: 0.6em;
+  word-break: break-all;
+}
+
+.breadcrumb>a {
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.breadcrumb>a:hover {
+  text-decoration: underline;
+}
+
+/* final breadcrumb */
+.breadcrumb>b {
+  color: var(--text-primary);
+}
+
+.breadcrumb>.separator {
+  color: var(--text-tertiary);
+  padding: 0 0.25em;
+}
+
+.breadcrumb svg {
+  height: 100%;
+  fill: var(--svg-secondary);
+}
+
+.toolbox {
+  display: flex;
+  margin-right: 10px;
+}
+
+.toolbox>a,
+.toolbox>div {
+  /* vertically align with breadcrumb text */
+  height: 1.1rem;
+}
+
+.toolbox .control {
+  cursor: pointer;
+  padding-left: 0.25em;
+}
+
+.upload-file input {
+  display: none;
+}
+
+.upload-file label {
+  cursor: pointer;
+}
+
+.searchbar {
+  display: flex;
+  flex-wrap: nowrap;
+  width: 246px;
+  height: 22px;
+  background-color: var(--bg-secondary);
+  transition: all .15s;
+  border: 1px var(--border-primary) solid;
+  border-radius: 15px;
+  margin-bottom: 2px;
+}
+
+.searchbar #search {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  font-size: 16px;
+  line-height: 16px;
+  padding: 1px;
+  color: var(--text-primary);
+  background-color: transparent;
+  border: none;
+  outline: none;
+}
+
+.searchbar .icon {
+  color: var(--svg-tertiary);
+  padding: 3px 3px;
+  cursor: pointer;
+}
+
+.searchbar svg {
+  fill: var(--svg-tertiary);
+}
+
+.main {
+  padding: 1em;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* file listing as a card */
+.paths-table {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(37, 36, 37, 0.05);
+  overflow: hidden;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.paths-table thead th {
+  padding: 0.6em 0.75em;
+  border-bottom: 1px solid var(--border-primary);
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.paths-table tbody td {
+  padding: 0.45em 0.75em;
+}
+
+.empty-folder {
+  font-style: italic;
+}
+
+.uploaders-table th,
+.paths-table th {
+  text-align: left;
+  font-weight: unset;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.uploaders-table td,
+.paths-table td {
+  white-space: nowrap;
+}
+
+.uploaders-table .cell-status {
+  padding-left: 0.6em;
+}
+
+.uploaders-table .cell-status span {
+  display: inline-block;
+}
+
+.uploaders-table .cell-size,
+.uploaders-table .cell-percent,
+.uploaders-table .cell-speed,
+.uploaders-table .cell-eta {
+  text-align: right;
+  padding-left: 0.6em;
+  font-variant-numeric: tabular-nums;
+}
+
+.paths-table thead a {
+  color: unset;
+  text-decoration: none;
+}
+
+.paths-table thead a>span {
+  padding-left: 2px;
+}
+
+.paths-table tbody tr:hover {
+  background-color: var(--bg-hover);
+}
+
+.paths-table tbody tr:first-child td {
+  border-top: none;
+}
+
+.paths-table .cell-actions {
+  width: 90px;
+  display: flex;
+  padding-left: 0.5em;
+}
+
+.paths-table .cell-mtime {
+  width: 120px;
+  padding-left: 0.5em;
+  font-variant-numeric: tabular-nums;
+}
+
+.paths-table .cell-size {
+  text-align: right;
+  width: 70px;
+  padding-left: 0.5em;
+  font-variant-numeric: tabular-nums;
+}
+
+.path svg {
+  height: 16px;
+  fill: var(--svg-secondary);
+  padding-right: 0.5em;
+  vertical-align: text-top;
+}
+
+.path {
+  list-style: none;
+}
+
+.path a {
+  color: var(--text-accent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  display: block;
+  text-decoration: none;
+  max-width: calc(100vw - 375px);
+  min-width: 170px;
+}
+
+.path a:hover {
+  text-decoration: underline;
+}
+
+.action-btn {
+  padding-right: 0.3em;
+  cursor: pointer;
+}
+
+.uploaders-table {
+  padding: 0.5em 0;
+}
+
+.uploader {
+  padding-right: 1em;
+}
+
+.editor {
+  width: 100%;
+  height: calc(100vh - 5rem);
+  border: 1px solid var(--border-secondary);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+  padding: 5px;
+}
+
+.toolbox-right {
+  margin-left: auto;
+  margin-right: 2em;
+}
+
+.login-btn {
+  cursor: pointer;
+}
+
+.save-btn {
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.logout-btn {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.user-name {
+  padding-left: 3px;
+}
+
+.not-editable {
+  font-style: italic;
+}
+
+.retry-btn {
+  cursor: pointer;
+}
+
+@media (min-width: 768px) {
+  .path a {
+    min-width: 400px;
+  }
+}
+
+/* dark theme — Atom-inspired dark palette */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg-primary: #17161f;
+    --bg-secondary: #1e1d28;
+    --bg-tertiary: #211f2e;
+    --bg-hover: #2a2839;
+    --bg-card: #211f2e;
+    --text-primary: #eceaf5;
+    --text-secondary: #a5a3b8;
+    --text-tertiary: #6b7280;
+    --text-accent: #a795ff;
+    --svg-primary: #eceaf5;
+    --svg-secondary: rgba(167, 149, 255, 0.6);
+    --svg-tertiary: #a5a3b8;
+    --border-primary: #35334a;
+    --border-secondary: #453f63;
+    --accent: #a795ff;
+    --accent-hover: #8f76f0;
+    --accent-soft: #2a2839;
+    --yellow: #f9e71c;
+  }
+}
+/* Cloudflare Access logout button injected into the dufs header */
+.access-logout {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 0.75em;
+  padding: 4px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85em;
+  font-weight: 600;
+  white-space: nowrap;
+  background: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+.access-logout:hover {
+  background: var(--accent);
+  color: #fff;
+}

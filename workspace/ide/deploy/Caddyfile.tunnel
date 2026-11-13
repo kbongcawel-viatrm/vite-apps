@@ -16,35 +16,6 @@
 	auto_https disable_redirects
 }
 
-https://ide.home-security.uk:8443 {
-	bind 127.0.0.1
-	tls internal
-
-	reverse_proxy 127.0.0.1:8080 {
-		# code-server uses WebSockets; Caddy handles the upgrade automatically.
-	}
-
-	header {
-		# Defense in depth on top of the edge proxy's headers.
-		X-Content-Type-Options nosniff
-		Referrer-Policy no-referrer
-		-Server
-	}
-}
-
-https://manager.home-security.uk:8443 {
-	bind 127.0.0.1
-	tls internal
-
-	reverse_proxy 127.0.0.1:5173
-
-	header {
-		X-Content-Type-Options nosniff
-		Referrer-Policy no-referrer
-		-Server
-	}
-}
-
 https://files.home-security.uk:8443 {
 	bind 127.0.0.1
 	tls internal
@@ -60,5 +31,5 @@ https://files.home-security.uk:8443 {
 
 # ---------------------------------------------------------------------------
 # Alternative: terminate real public TLS here instead of at Cloudflare (direct
-# DNS, no tunnel). Requires public 80/443 — see deploy/Caddyfile.
+# DNS, no tunnel). Requires public 80/443.
 # ---------------------------------------------------------------------------

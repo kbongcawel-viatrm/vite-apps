@@ -1,0 +1,79 @@
+# Unified edge deployment & file-manager stack (rootless Podman)
+#
+# ROOTLESS ONLY: run podman-compose as your normal user — never via sudo.
+#   podman-compose up -d
+#   podman-compose down
+#
+# Network flow:
+#   browser -> Cloudflare edge (Access SSO) -> cloudflared -> Caddy :8443
+#     -> 127.0.0.1:5050  dufs file manager   (files.home-security.uk)
+#
+# | Service/Container      | Listen address    | Public hostname        | Notes                                              | Run as                                          |
+# |------------------------|-------------------|------------------------|----------------------------------------------------|-----------------------------------------------|
+# | File manager (dufs)    | 127.0.0.1:5050    | files.home-security.uk | -> container :5000; container vite-apps_dufs_1    | podman-compose -f compose.yaml up -d / stop dufs |
+# | vite-apps_caddy_1      | 127.0.0.1:8443    | —                      | TLS origin for cloudflared, tls internal vhosts   | podman-compose -f compose.yaml up -d / down      |
+# |                        | (host net)        |                        |                                                    |                                               |
+# | vite-apps_cloudflared_1| host network      | files.home-security.uk | dials out to Cloudflare; no inbound ports          | podman-compose -f compose.yaml up -d / down      |
+# |                        | outbound only     |                        |                                                    |                                               |
+#
+# Per-app segregation: `name` pins the podman-compose project so this stack's
+# containers can never collide with other apps' tunnels on the same host.
+
+name: vite-apps
+
+services:
+  caddy:
+    image: docker.io/library/caddy:2
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./workspace/ide/deploy/Caddyfile.tunnel:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    # Serves https://127.0.0.1:8443 for ide./manager./files.home-security.uk
+
+  cloudflared:
+    image: docker.io/cloudflare/cloudflared:latest
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    network_mode: host
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    env_file:
+      - ./.env   # repo-root .env containing TUNNEL_TOKEN
+
+  dufs:
+    build: ./workspace/file-manager
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    ports:
+      - "127.0.0.1:5050:5000"
+    # FUSE mount for rclone; SYS_ADMIN is namespaced under rootless podman.
+    devices:
+      - /dev/fuse
+    cap_add:
+      - SYS_ADMIN
+    environment:
+      - FTP_HOST=192.168.2.1
+      - FTP_PORT=21
+    env_file:
+      - ./workspace/file-manager/.env   # FTP_USER / FTP_PW
+    volumes:
+      # Vendored dufs UI assets (adds Access logout link); :Z for SELinux.
+      - ./workspace/file-manager/assets:/assets:ro,Z
+
+volumes:
+  caddy_data:
+  caddy_config:
