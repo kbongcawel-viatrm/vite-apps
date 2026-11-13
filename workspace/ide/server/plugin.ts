@@ -1,5 +1,9 @@
 import type { Plugin } from 'vite'
-import { createCodeServerManager, createRateLimiter } from './code-server-manager.mjs'
+import { randomBytes } from 'node:crypto'
+import {
+  createCodeServerManager, createRateLimiter,
+  githubAuthorizeUrl, githubOAuthLogin,
+} from './code-server-manager.mjs'
 
 /**
  * Vite plugin that manages a hardened local code-server instance.
@@ -41,10 +45,51 @@ export function codeServerManager(): Plugin {
 
   function mount(middlewares: any) {
     const allowLogin = createRateLimiter({ windowMs: 60_000, max: 5 })
-    middlewares.use('/api/code-server', (req: any, res: any, next: any) => {
+    middlewares.use('/api/code-server', async (req: any, res: any, next: any) => {
       const url = (req.url || '/').split('?')[0]
       res.setHeader('Content-Type', 'application/json')
       res.setHeader('Cache-Control', 'no-store')
+
+      // GitHub OAuth — unauthenticated by design; issues the session cookie.
+      if (url === '/auth/github' && req.method === 'GET') {
+        if (!manager!.oauthEnabled) { res.statusCode = 404; res.end('{}'); return }
+        const state = randomBytes(16).toString('base64url')
+        const proto = Boolean(req.socket.encrypted) || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http'
+        const redirectUri = `${proto}://${req.headers.host}/api/code-server/auth/github/callback`
+        const secure = proto === 'https'
+        res.writeHead(302, {
+          Location: githubAuthorizeUrl({ clientId: manager!.oauthConfig.clientId, redirectUri, state }),
+          'Set-Cookie': `vite_apps_oauth_state=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${secure ? '; Secure' : ''}`,
+        })
+        res.end()
+        return
+      }
+
+      if (url === '/auth/github/callback' && req.method === 'GET') {
+        const q = new URL(req.url || '/', 'http://x').searchParams
+        const cookieHeader = String(req.headers.cookie || '')
+        const stateCookie = cookieHeader.split(';').map((c: string) => c.trim()).find((c: string) => c.startsWith('vite_apps_oauth_state='))?.split('=')[1]
+        const clearState = 'vite_apps_oauth_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'
+        if (!manager!.oauthEnabled || q.get('state') !== stateCookie || !q.get('code')) {
+          res.statusCode = 400
+          res.setHeader('Set-Cookie', clearState)
+          res.end(JSON.stringify({ error: 'oauth failed' }))
+          return
+        }
+        const ghLogin = await githubOAuthLogin({ ...manager!.oauthConfig, code: q.get('code') })
+        if (!ghLogin || !manager!.oauthConfig.allowedUsers.has(ghLogin.toLowerCase())) {
+          res.statusCode = 403
+          res.setHeader('Set-Cookie', clearState)
+          res.end(JSON.stringify({ error: ghLogin ? 'user not allowed' : 'github login failed' }))
+          return
+        }
+        const token = manager!.createSession()
+        const secure = Boolean(req.socket.encrypted) || req.headers['x-forwarded-proto'] === 'https'
+        res.setHeader('Set-Cookie', [clearState, manager!.sessionCookieHeader(token, secure)])
+        res.writeHead(302, { Location: '/' })
+        res.end()
+        return
+      }
 
       if (url === '/login' && req.method === 'POST') {
         if (!allowLogin(req.socket.remoteAddress || '')) {
@@ -71,6 +116,9 @@ export function codeServerManager(): Plugin {
         manager!.logout(manager!.sessionTokenFromReq(req))
         res.setHeader('Set-Cookie', 'vite_apps_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0')
         res.end(JSON.stringify({ ok: true }))
+      } else if (url === '/config' && req.method === 'GET') {
+        // Public config for the login UI — reveals only whether OAuth is on.
+        res.end(JSON.stringify({ githubOAuth: manager!.oauthEnabled }))
       } else if (url === '/status' && req.method === 'GET') {
         if (!manager!.apiAuthorized(req)) {
           res.statusCode = 401

@@ -91,6 +91,9 @@ button.danger { background: var(--danger); border-color: var(--danger); color: #
 button.danger:hover { background: #8f1f2b; border-color: #8f1f2b; }
 
 .hint { margin-top: 1.25rem; font-size: 0.8rem; color: #9b9b9b; }
+.alt { margin: 1rem 0 0; text-align: center; }
+.alt a { color: var(--link); font-size: 0.9rem; text-decoration: none; }
+.alt a:hover { color: var(--link-hover); text-decoration: underline; }
 
 form label {
   display: block;

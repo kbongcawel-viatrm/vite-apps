@@ -154,6 +154,14 @@ session cookie (12 h TTL, `Secure` when served over HTTPS). API clients can
 alternatively send `Authorization: Bearer <PASSWORD>` directly. Sessions
 are in-memory and die with the process.
 
+**GitHub OAuth (optional):** set `GITHUB_OAUTH_CLIENT_ID`,
+`GITHUB_OAUTH_CLIENT_SECRET`, and `GITHUB_OAUTH_ALLOWED_USERS` (comma-separated
+GitHub usernames) in `.env` to add a "Sign in with GitHub" button. The same
+allowlist gates both the manager and the editor — for the editor, the edge
+proxy completes OAuth and silently logs into code-server with `PASSWORD`,
+so users never see the password form. Register the callback URLs shown in
+`.env.example`. Password login remains available as the fallback.
+
 ---
 
 ## ⚙️ Configuration
