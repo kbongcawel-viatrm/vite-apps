@@ -163,8 +163,13 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
     })
   }
 
+  // Resolves once the previous code-server process has exited and the edge
+  // proxy port is released, so a quick stop→start can't hit EADDRINUSE.
+  let draining = Promise.resolve()
+  let launching = false
+
   function start() {
-    if (child || state === 'starting') return status()
+    if (child || launching || state === 'starting') return status()
     if (!password) {
       state = 'error'
       lastError = 'PASSWORD is not set. Copy .env.example to .env and set a strong password.'
@@ -172,13 +177,26 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
     }
     state = 'starting'
     lastError = null
+    launching = true
+    draining.then(launch).catch((e) => {
+      launching = false
+      state = 'error'
+      lastError = e.message
+      logger.error('[code-server] launch failed:', e.message)
+    })
+    return status()
+  }
+
+  function launch() {
+    if (child || state !== 'starting') { launching = false; return }
 
     let bin = findBinary()
     if (!bin && installBinary()) bin = join(rootDir, 'bin', 'code-server')
     if (!bin) {
+      launching = false
       state = 'error'
       lastError = 'code-server binary not found and automatic install failed. Run: npm run install:code-server'
-      return status()
+      return
     }
 
     mkdirSync(logsDir, { recursive: true })
@@ -208,6 +226,7 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     child = proc
+    launching = false
     proc.stdout.pipe(out)
     proc.stderr.pipe(err)
 
@@ -233,21 +252,27 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
     // Give code-server a moment, then mark running (it keeps running even if
     // the health check races startup; the proxy will 502 until ready).
     setTimeout(() => { if (child === proc) state = 'running' }, 1500)
-    return status()
   }
 
   function stop() {
     const proc = child
     child = null
+    let procExit = Promise.resolve()
     if (proc) {
+      procExit = new Promise((r) => proc.once('exit', r))
       proc.kill('SIGTERM')
       setTimeout(() => { if (proc.exitCode === null && proc.signalCode === null) proc.kill('SIGKILL') }, 5000).unref()
     }
+    let edgeClosed = Promise.resolve()
     if (edgeServer) {
-      edgeServer.close()
+      const s = edgeServer
       edgeServer = null
+      s.closeIdleConnections?.()
+      s.closeAllConnections?.()
+      edgeClosed = new Promise((r) => s.close(() => r()))
     }
     proxy = null
+    draining = Promise.all([procExit, edgeClosed]).then(() => {})
     state = 'stopped'
     return status()
   }
