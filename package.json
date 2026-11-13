@@ -12,7 +12,8 @@
     "preview": "npm run preview --workspace workspace/mgmt-dashboard",
     "server": "node workspace/ide/server/standalone.mjs",
     "install:code-server": "bash workspace/ide/scripts/install-code-server.sh",
-    "deploy": "bash workspace/ide/scripts/deploy.sh"
+    "deploy": "bash workspace/ide/scripts/deploy.sh",
+    "file-manager": "podman-compose -f workspace/file-manager/compose.yaml"
   },
   "dependencies": {
     "http-proxy": "^1.18.1"

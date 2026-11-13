@@ -1,0 +1,29 @@
+# file-manager — dufs web file manager over an FTP share, rootless podman.
+#
+# The container mounts ftp://$FTP_HOST:$FTP_PORT (default 192.168.2.1:21)
+# via rclone/FUSE and serves it with dufs on 127.0.0.1:5050.
+# Public exposure goes through the vite-apps Caddy + cloudflared stack
+# (files.home-security.uk -> Caddy :8443 -> here).
+#
+#   podman-compose -f workspace/file-manager/compose.yaml up -d
+#   podman-compose -f workspace/file-manager/compose.yaml down
+#
+# Credentials: FTP_USER / FTP_PW in workspace/file-manager/.env (never commit it).
+#
+# ROOTLESS ONLY — never run via sudo (same rule as workspace/ide).
+
+name: file-manager
+
+services:
+  dufs:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5050:5000"
+    # FUSE mount for rclone; SYS_ADMIN is namespaced under rootless podman.
+    devices:
+      - /dev/fuse
+    cap_add:
+      - SYS_ADMIN
+    env_file:
+      - .env   # workspace/file-manager/.env — FTP_USER / FTP_PW

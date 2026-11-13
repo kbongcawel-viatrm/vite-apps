@@ -45,6 +45,19 @@ https://manager.home-security.uk:8443 {
 	}
 }
 
+https://files.home-security.uk:8443 {
+	bind 127.0.0.1
+	tls internal
+
+	reverse_proxy 127.0.0.1:5050
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+}
+
 # ---------------------------------------------------------------------------
 # Alternative: terminate real public TLS here instead of at Cloudflare (direct
 # DNS, no tunnel). Requires public 80/443 — see deploy/Caddyfile.
