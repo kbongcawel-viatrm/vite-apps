@@ -147,3 +147,10 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# vite-ide local secrets & runtime data
+.env
+bin/
+.code-server-data/
+workspace/
+vendor/

@@ -1,0 +1,21 @@
+{
+  "name": "vite-ide",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "install:code-server": "bash scripts/install-code-server.sh",
+    "server": "node server/standalone.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  }
+}

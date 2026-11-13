@@ -1,0 +1,19 @@
+# Example: TLS-terminated public access to the hardened code-server proxy.
+# The edge proxy binds 127.0.0.1:8080 — only Caddy can reach it.
+#
+#   caddy run --config deploy/Caddyfile
+#
+# Replace ide.example.com with your domain and open 80/443 inbound.
+
+ide.example.com {
+	reverse_proxy 127.0.0.1:8080 {
+		# code-server uses WebSockets; Caddy handles the upgrade automatically.
+	}
+
+	header {
+		# Defense in depth on top of the edge proxy's headers.
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+}
