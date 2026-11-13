@@ -89,5 +89,17 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button.primary:hover { background: #2c6aa0; border-color: #2c6aa0; color: #fff; }
 button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
 button.danger:hover { background: #8f1f2b; border-color: #8f1f2b; }
+a.btn {
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.95rem;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+a.btn:hover { border-color: var(--accent); color: var(--accent); }
 
 .hint { margin-top: 1.25rem; font-size: 0.8rem; color: #9b9b9b; }
