@@ -1,19 +1,18 @@
 {
-  "name": "vite-ide",
+  "name": "vite-apps",
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "workspace/mgmt-dashboard"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "install:code-server": "bash scripts/install-code-server.sh",
-    "server": "node server/standalone.mjs"
-  },
-  "devDependencies": {
-    "@types/node": "^26.6.6",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.8"
+    "dev": "npm run dev --workspace workspace/mgmt-dashboard",
+    "build": "npm run build --workspace workspace/mgmt-dashboard",
+    "preview": "npm run preview --workspace workspace/mgmt-dashboard",
+    "server": "node workspace/ide/server/standalone.mjs",
+    "install:code-server": "bash workspace/ide/scripts/install-code-server.sh",
+    "deploy": "bash workspace/ide/scripts/deploy.sh"
   },
   "dependencies": {
     "http-proxy": "^1.18.1"

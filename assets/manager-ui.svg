@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="560" viewBox="0 0 760 560" role="img" aria-label="vite-ide management UI mockup">
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="560" viewBox="0 0 760 560" role="img" aria-label="vite-apps management UI mockup">
   <defs>
     <linearGradient id="pagebg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#f4f5fb"/><stop offset="100%" stop-color="#e8ebf7"/>
@@ -34,7 +34,7 @@
   <!-- card -->
   <rect x="160" y="120" width="440" height="356" rx="16" fill="url(#cardbg)" stroke="#e6e9f5" stroke-width="1.5"/>
 
-  <text x="380" y="170" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="34" font-weight="800" fill="#1e1b4b">vite-ide</text>
+  <text x="380" y="170" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="34" font-weight="800" fill="#1e1b4b">vite-apps</text>
   <text x="380" y="200" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="14" fill="#64748b">Secure code-server manager</text>
 
   <!-- status rows -->
@@ -47,7 +47,7 @@
     <text x="480" y="288" font-family="ui-monospace, monospace" font-size="13" fill="#334155">35250</text>
 
     <text x="196" y="332" fill="#475569">Workspace</text>
-    <text x="480" y="332" font-family="ui-monospace, monospace" font-size="12" fill="#334155">…/vite-ide/workspace</text>
+    <text x="480" y="332" font-family="ui-monospace, monospace" font-size="12" fill="#334155">…/vite-apps/workspace</text>
 
     <text x="196" y="376" fill="#475569">Editor</text>
     <text x="480" y="376" font-family="ui-monospace, monospace" font-size="13" fill="#7f5af0">localhost:8080 ↗</text>

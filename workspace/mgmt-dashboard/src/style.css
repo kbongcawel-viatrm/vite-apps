@@ -63,3 +63,25 @@ button.primary { background: #0369a1; border-color: #0369a1; }
 button.danger { background: #991b1b; border-color: #991b1b; }
 
 .hint { margin-top: 1.25rem; font-size: 0.8rem; color: #64748b; }
+
+form label {
+  display: block;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-bottom: 0.35rem;
+}
+form input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+}
+form input:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 1px;
+  border-color: #7dd3fc;
+}

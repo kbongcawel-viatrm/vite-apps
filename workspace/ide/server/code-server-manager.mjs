@@ -4,9 +4,11 @@ import { existsSync, mkdirSync, createWriteStream, readFileSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import httpProxy from 'http-proxy'
+import { timingSafeEqual } from 'node:crypto'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
-const ROOT = resolve(__dirname, '..')
+// server/ -> ide/ -> workspace/ -> repo root
+const ROOT = resolve(__dirname, '../../..')
 
 /** Minimal .env parser (no dependency). Returns {} when file is absent. */
 export function loadDotEnv(path = join(ROOT, '.env')) {
@@ -90,7 +92,8 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
 
   const binCandidates = [
     process.env.CODE_SERVER_BIN,
-    join(rootDir, 'bin', 'code-server'),
+    join(rootDir, 'workspace', 'ide', 'bin', 'code-server'),
+    join(rootDir, 'bin', 'code-server'), // legacy location
     'code-server',
   ].filter(Boolean)
 
@@ -104,14 +107,16 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
   }
 
   function installBinary() {
-    const script = join(rootDir, 'scripts', 'install-code-server.sh')
+    const script = join(rootDir, 'workspace', 'ide', 'scripts', 'install-code-server.sh')
     if (!existsSync(script)) return false
     logger.log('[code-server] binary not found, running install script…')
     const r = spawnSync('bash', [script], { cwd: rootDir, stdio: 'inherit' })
-    return r.status === 0 && existsSync(join(rootDir, 'bin', 'code-server'))
+    return r.status === 0 && existsSync(join(rootDir, 'workspace', 'ide', 'bin', 'code-server'))
   }
 
   function startEdgeProxy() {
+    // The proxy outlives code-server restarts; only bind once.
+    if (edgeServer) return Promise.resolve()
     mkdirSync(logsDir, { recursive: true })
     mkdirSync(workspaceDir, { recursive: true })
 
@@ -191,7 +196,7 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
     if (child || state !== 'starting') { launching = false; return }
 
     let bin = findBinary()
-    if (!bin && installBinary()) bin = join(rootDir, 'bin', 'code-server')
+    if (!bin && installBinary()) bin = join(rootDir, 'workspace', 'ide', 'bin', 'code-server')
     if (!bin) {
       launching = false
       state = 'error'
@@ -215,7 +220,7 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
       '--disable-workspace-trust',
       '--user-data-dir', join(dataDir, 'user'),
       '--extensions-dir', join(dataDir, 'extensions'),
-      '--welcome-text', 'vite-ide secure code mode',
+      '--welcome-text', 'vite-apps secure code mode',
       workspaceDir,
     ]
 
@@ -277,6 +282,18 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
     return status()
   }
 
+  // Manager API auth: mutating endpoints require `Authorization: Bearer
+  // <PASSWORD>` — the same secret code-server uses for login. /status stays
+  // public (read-only; already reports passwordConfigured).
+  function apiAuthorized(req) {
+    if (!password) return false
+    const m = (req.headers['authorization'] || '').match(/^Bearer\s+(.+)$/i)
+    if (!m) return false
+    const a = Buffer.from(m[1])
+    const b = Buffer.from(password)
+    return a.length === b.length && timingSafeEqual(a, b)
+  }
+
   function status() {
     return {
       state,
@@ -288,5 +305,5 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
     }
   }
 
-  return { start, stop, status }
+  return { start, stop, status, apiAuthorized }
 }

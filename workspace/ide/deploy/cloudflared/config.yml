@@ -1,0 +1,48 @@
+# Cloudflare Tunnel ingress for vite-apps.
+#
+# Prerequisites (one-time, on any machine with `cloudflared` installed):
+#   cloudflared tunnel login                          # browser auth -> cert.pem
+#   cloudflared tunnel create vite-apps                # prints a tunnel UUID
+#   cloudflared tunnel route dns vite-apps ide.home-security.uk
+#   cloudflared tunnel route dns vite-apps manager.home-security.uk
+#   cloudflared tunnel token vite-apps > /dev/null     # or copy credentials.json
+#
+# Then place the generated credentials file here:
+#   mv ~/.cloudflared/<TUNNEL_ID>.json deploy/cloudflared/credentials.json
+# (gitignored — it contains the tunnel secret)
+#
+# "Private hosting" option: to make the app reachable ONLY to WARP-enrolled
+# devices (no public hostname), skip the `hostname` ingress rules below and
+# instead route a private CIDR to this tunnel from the Zero Trust dashboard
+# (Networks -> Tunnels -> Private Network) or:
+#   cloudflared tunnel route ip add <LAN-CIDR> vite-apps
+# Devices then reach the app at its private IP over WARP. A private *hostname*
+# additionally requires private DNS (Split Tunnels / Local Domain Fallback).
+
+tunnel: TUNNEL_ID_PLACEHOLDER
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  # Editor -> Caddy TLS origin (https, internal CA; noTLSVerify required)
+  - hostname: ide.home-security.uk
+    service: https://127.0.0.1:8443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: ide.home-security.uk
+
+  # Manager UI -> same Caddy origin, different vhost.
+  # NOTE: /api/code-server/{start,stop} requires the PASSWORD bearer token
+  # (same secret as code-server login). The UI prompts for it once.
+  # For stronger protection put Cloudflare Access in front of this hostname.
+  - hostname: manager.home-security.uk
+    service: https://127.0.0.1:8443
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: manager.home-security.uk
+
+  # Catch-all: anything else gets a 404
+  - service: http_status:404
+
+# For WARP-only private hostname access, uncomment and configure private DNS:
+# warp-routing:
+#   enabled: true

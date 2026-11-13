@@ -148,9 +148,19 @@ vite.config.ts.timestamp-*
 # Turbo Repo
 .turbo
 
-# vite-ide local secrets & runtime data
+# vite-apps local secrets & runtime data
 .env
 bin/
 .code-server-data/
-workspace/
 vendor/
+
+# workspace/ holds the two projects (tracked) plus any scratch dirs the IDE
+# opens (ignored). bin/ and vendor/ inside workspace/ide stay ignored via the
+# patterns above.
+workspace/*
+!workspace/mgmt-dashboard/
+!workspace/ide/
+
+# Cloudflare tunnel credentials (never commit)
+**/deploy/cloudflared/credentials.json
+**/deploy/cloudflared/cert.pem

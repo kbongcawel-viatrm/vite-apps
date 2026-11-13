@@ -45,10 +45,11 @@ cp -a "$PKG_DIR/." "$VENDOR_DIR/"
 
 # bin/code-server in the release is a wrapper that resolves ../lib relative to
 # its own location, so a bare symlink into bin/ would break. Write a small
-# wrapper that execs the real entrypoint inside vendor/.
-cat > "$BIN" <<EOF
+# wrapper that resolves vendor/ relative to itself, so the tree can be moved.
+cat > "$BIN" <<'EOF'
 #!/usr/bin/env bash
-exec "$VENDOR_DIR/bin/code-server" "\$@"
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+exec "$HERE/../vendor/code-server/bin/code-server" "$@"
 EOF
 chmod +x "$BIN" "$VENDOR_DIR/bin/code-server"
 

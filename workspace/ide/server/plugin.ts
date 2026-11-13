@@ -47,10 +47,16 @@ export function codeServerManager(): Plugin {
 
       if (url === '/status' && req.method === 'GET') {
         res.end(JSON.stringify(manager!.status()))
-      } else if (url === '/start' && req.method === 'POST') {
-        res.end(JSON.stringify(manager!.start()))
-      } else if (url === '/stop' && req.method === 'POST') {
-        res.end(JSON.stringify(manager!.stop()))
+      } else if (url === '/verify' && req.method === 'POST') {
+        res.statusCode = manager!.apiAuthorized(req) ? 200 : 401
+        res.end(JSON.stringify(manager!.apiAuthorized(req) ? { ok: true } : { error: 'unauthorized' }))
+      } else if ((url === '/start' || url === '/stop') && req.method === 'POST') {
+        if (!manager!.apiAuthorized(req)) {
+          res.statusCode = 401
+          res.end(JSON.stringify({ error: 'unauthorized' }))
+        } else {
+          res.end(JSON.stringify(url === '/start' ? manager!.start() : manager!.stop()))
+        }
       } else {
         res.statusCode = 404
         res.end(JSON.stringify({ error: 'not found' }))
@@ -59,7 +65,7 @@ export function codeServerManager(): Plugin {
   }
 
   return {
-    name: 'vite-ide:code-server-manager',
+    name: 'vite-apps:code-server-manager',
     ...handler,
   }
 }

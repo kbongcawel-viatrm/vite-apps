@@ -1,0 +1,51 @@
+# Caddy TLS origin for the Cloudflare Tunnel deployment.
+#
+# Two TLS layers:
+#   1. Cloudflare edge terminates public TLS for *.home-security.uk
+#   2. Caddy serves HTTPS on 127.0.0.1:8443 with its internal CA — so the
+#      cloudflared -> Caddy hop is encrypted too (cloudflared uses
+#      `noTLSVerify` since these are Caddy-internal certs).
+#
+# `bind 127.0.0.1` keeps the listener off LAN/public interfaces; only
+# cloudflared (host networking) can reach it.
+#
+# disable_redirects: rootless podman cannot bind :80, and cloudflared only
+# ever calls the 8443 TLS listener — no HTTP->HTTPS redirect is needed.
+
+{
+	auto_https disable_redirects
+}
+
+https://ide.home-security.uk:8443 {
+	bind 127.0.0.1
+	tls internal
+
+	reverse_proxy 127.0.0.1:8080 {
+		# code-server uses WebSockets; Caddy handles the upgrade automatically.
+	}
+
+	header {
+		# Defense in depth on top of the edge proxy's headers.
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+}
+
+https://manager.home-security.uk:8443 {
+	bind 127.0.0.1
+	tls internal
+
+	reverse_proxy 127.0.0.1:5173
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+}
+
+# ---------------------------------------------------------------------------
+# Alternative: terminate real public TLS here instead of at Cloudflare (direct
+# DNS, no tunnel). Requires public 80/443 — see deploy/Caddyfile.
+# ---------------------------------------------------------------------------

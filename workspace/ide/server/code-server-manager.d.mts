@@ -11,6 +11,7 @@ export interface CodeServerManager {
   start(): CodeServerStatus
   stop(): CodeServerStatus
   status(): CodeServerStatus
+  apiAuthorized(req: { headers: Record<string, string | string[] | undefined> }): boolean
 }
 
 export function loadDotEnv(path?: string): Record<string, string>

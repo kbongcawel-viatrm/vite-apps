@@ -4,11 +4,13 @@ import { createServer } from 'node:http'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { join, extname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createCodeServerManager } from './code-server-manager.mjs'
+import { createCodeServerManager, loadDotEnv } from './code-server-manager.mjs'
 
-const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const DIST = join(ROOT, 'dist')
-const PORT = Number(process.env.VITE_PORT || 5173)
+// server/ -> ide/ -> workspace/ -> repo root
+const ROOT = resolve(fileURLToPath(new URL('../../..', import.meta.url)))
+const DIST = join(ROOT, 'workspace', 'mgmt-dashboard', 'dist')
+const dotenv = loadDotEnv(join(ROOT, '.env'))
+const PORT = Number(process.env.VITE_PORT ?? dotenv.VITE_PORT ?? 5173)
 
 const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
@@ -27,9 +29,19 @@ createServer((req, res) => {
     res.setHeader('Content-Type', 'application/json')
     res.setHeader('Cache-Control', 'no-store')
     if (action === '/status' && req.method === 'GET') res.end(JSON.stringify(manager.status()))
-    else if (action === '/start' && req.method === 'POST') res.end(JSON.stringify(manager.start()))
-    else if (action === '/stop' && req.method === 'POST') res.end(JSON.stringify(manager.stop()))
-    else { res.statusCode = 404; res.end('{}') }
+    else if (action === '/verify' && req.method === 'POST') {
+      const ok = manager.apiAuthorized(req)
+      res.statusCode = ok ? 200 : 401
+      res.end(JSON.stringify(ok ? { ok: true } : { error: 'unauthorized' }))
+    }
+    else if ((action === '/start' || action === '/stop') && req.method === 'POST') {
+      if (!manager.apiAuthorized(req)) {
+        res.statusCode = 401
+        res.end(JSON.stringify({ error: 'unauthorized' }))
+      } else {
+        res.end(JSON.stringify(action === '/start' ? manager.start() : manager.stop()))
+      }
+    } else { res.statusCode = 404; res.end('{}') }
     return
   }
 
@@ -46,5 +58,5 @@ createServer((req, res) => {
   })
   createReadStream(file).pipe(res)
 }).listen(PORT, () => {
-  console.log(`vite-ide UI on http://localhost:${PORT}`)
+  console.log(`vite-apps UI on http://localhost:${PORT}`)
 })
