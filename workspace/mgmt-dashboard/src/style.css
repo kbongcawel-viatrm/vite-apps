@@ -44,9 +44,9 @@ body {
   box-shadow: 0 20px 50px rgb(23 54 82 / 0.12);
 }
 
-.card.login { width: min(380px, 92vw); }
-
-h1 { margin: 0; font-size: 1.6rem; color: var(--accent-strong); }
+h1 { margin: 0; font-size: 1.6rem; color: var(--accent-strong); display: flex; align-items: center; gap: 0.5rem; }
+.gh { color: var(--text-dim); display: inline-flex; }
+.gh:hover { color: var(--accent-strong); }
 .sub { margin: 0.25rem 0 1.5rem; color: var(--text-dim); }
 
 .row {
@@ -91,26 +91,3 @@ button.danger { background: var(--danger); border-color: var(--danger); color: #
 button.danger:hover { background: #8f1f2b; border-color: #8f1f2b; }
 
 .hint { margin-top: 1.25rem; font-size: 0.8rem; color: #9b9b9b; }
-.alt { margin: 1rem 0 0; text-align: center; }
-
-form label {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--text-dim);
-  margin-bottom: 0.35rem;
-}
-form input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.55rem 0.75rem;
-  border-radius: 8px;
-  border: 1px solid var(--border-strong);
-  background: var(--input-bg);
-  color: var(--accent);
-  font-size: 0.95rem;
-}
-form input:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 1px;
-  border-color: var(--accent-strong);
-}

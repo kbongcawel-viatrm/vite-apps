@@ -9,42 +9,7 @@ interface Status {
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
-async function api(path: string, opts: RequestInit = {}): Promise<Response> {
-  // Session cookie is sent automatically (same-origin fetch).
-  return fetch(path, opts)
-}
-
-let authed = false
-
-async function showLogin(message = '') {
-  authed = false
-  app.innerHTML = `
-    <main class="card login">
-      <h1>vite-apps</h1>
-      <p class="sub">Manager sign in</p>
-      <form id="login">
-        <label for="pw">Password</label>
-        <input id="pw" type="password" autocomplete="current-password" required autofocus />
-        ${message ? `<p class="row error"><span></span><span>${escapeHtml(message)}</span></p>` : ''}
-        <div class="actions"><button class="primary" type="submit">Sign in</button></div>
-      </form>
-      <p class="hint">Uses the manager password from .env.</p>
-    </main>`
-  const form = document.getElementById('login') as HTMLFormElement
-  form.onsubmit = async (e) => {
-    e.preventDefault()
-    const pw = (document.getElementById('pw') as HTMLInputElement).value
-    const r = await api('/api/code-server/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw }),
-    })
-    if (r.status === 401) { showLogin('Incorrect password — try again.'); return }
-    if (r.status === 429) { showLogin('Too many attempts — wait a minute.'); return }
-    if (!r.ok) { showLogin('Sign-in failed — try again.'); return }
-    location.reload()
-  }
-}
+const GITHUB_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744-.084-.729-.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>`
 
 function badge(state: Status['state']) {
   const cls = { stopped: 'off', starting: 'warn', running: 'on', error: 'err' }[state]
@@ -52,14 +17,12 @@ function badge(state: Status['state']) {
 }
 
 async function refresh() {
-  const res = await api('/api/code-server/status')
-  if (res.status === 401) { showLogin(); return }
+  const res = await fetch('/api/code-server/status')
   const s: Status = await res.json()
-  authed = true
 
   app.innerHTML = `
     <main class="card">
-      <h1>vite-apps</h1>
+      <h1>vite-apps <a class="gh" href="https://github.com/kbongcawel-viatrm/vite-ide" target="_blank" rel="noopener" title="GitHub repository">${GITHUB_ICON}</a></h1>
       <p class="sub">Secure code-server manager</p>
 
       <div class="row"><span>Status</span>${badge(s.state)}</div>
@@ -72,23 +35,16 @@ async function refresh() {
           ? `<button id="stop" class="danger">Stop</button>`
           : `<button id="start" class="primary">Start code-server</button>`}
         <button id="refresh">Refresh</button>
-        <button id="logout">Sign out</button>
       </div>
     </main>`
 
   document.getElementById('refresh')!.onclick = refresh
-  document.getElementById('logout')!.onclick = async () => {
-    await api('/api/code-server/logout', { method: 'POST' })
-    location.reload()
-  }
   document.getElementById('start')?.addEventListener('click', async () => {
-    const r = await api('/api/code-server/start', { method: 'POST' })
-    if (r.status === 401) { showLogin('Incorrect password.'); return }
+    await fetch('/api/code-server/start', { method: 'POST' })
     setTimeout(refresh, 800)
   })
   document.getElementById('stop')?.addEventListener('click', async () => {
-    const r = await api('/api/code-server/stop', { method: 'POST' })
-    if (r.status === 401) { showLogin('Incorrect password.'); return }
+    await fetch('/api/code-server/stop', { method: 'POST' })
     setTimeout(refresh, 300)
   })
 }
@@ -98,4 +54,4 @@ function escapeHtml(s: string) {
 }
 
 refresh()
-setInterval(() => { if (authed) refresh() }, 5000)
+setInterval(refresh, 5000)

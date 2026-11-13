@@ -142,25 +142,15 @@ same Node process that owns the edge proxy. It polls
 |---|---|
 | **Status badge** | `stopped` · `starting` · `running` · `error` — live state of code-server |
 | **Editor** | Deep link to `PUBLIC_EDITOR_URL` — opens the login page in a new tab |
-| **Start / Stop** | `POST /api/code-server/start` / `/stop` — require a valid session |
+| **Start / Stop** | `POST /api/code-server/start` / `/stop` |
 | **Refresh** | Force an immediate status re-fetch |
-| **Sign out** | `POST /api/code-server/logout` — clears the session cookie |
+| **Sign out** | — removed; sign out via Cloudflare Access instead |
 
-The whole UI is gated: unauthenticated visitors get a sign-in page and no
-static assets are served. `POST /api/code-server/login` accepts the same
-`PASSWORD` from `.env` that code-server uses (timing-safe comparison,
-rate-limited to 5 attempts/min/IP) and sets an `HttpOnly; SameSite=Strict`
-session cookie (12 h TTL, `Secure` when served over HTTPS). API clients can
-alternatively send `Authorization: Bearer <PASSWORD>` directly. Sessions
-are in-memory and die with the process.
-
-**Cloudflare Access (SSO):** both public hostnames are fronted by a
-[Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/)
-self-hosted application (`ide.` + `manager.home-security.uk`) on the
-`home-security-xyz` team domain. Visitors authenticate with the configured
-identity providers (GitHub, Google, one-time PIN) against the account's
-allow policy **before** reaching the app — the app-level `PASSWORD` login
-remains as the second layer. Access sessions last 24 h.
+The dashboard is intentionally minimal: **Status** and the **Editor** URL
+only. Public access is gated entirely by **Cloudflare Access** (see below);
+the app itself binds to `127.0.0.1` and its management API is reachable only
+from localhost or through the tunnel. The editor still requires `PASSWORD`
+at the code-server login.
 
 ---
 
@@ -263,14 +253,12 @@ Manage with `podman-compose ps|logs|down`.
 | `https://manager.home-security.uk` | manager UI — status/start/stop dashboard |
 | `http://localhost:5173` / `:8080` | same services, local only |
 
-> 🔐 Public access is double-gated: **Cloudflare Access** (SSO via the
+> 🔐 Public access is gated by **Cloudflare Access** (SSO via the
 > `home-security-xyz` team domain — GitHub/Google/OTP, allow-listed emails)
-> runs before any request reaches the tunnel, and the app itself requires
-> `PASSWORD` — the manager issues an `HttpOnly; SameSite=Strict` session
-> cookie (12 h TTL, `Secure` over HTTPS) via `POST /api/code-server/login`
-> (timing-safe, rate-limited 5/min/IP), and code-server asks for the same
-> password on first editor visit. All `/api/code-server/*` endpoints accept
-> the session cookie or `Authorization: Bearer <PASSWORD>`.
+> before any request reaches the tunnel; sign out from the Access session.
+> The editor itself still asks for `PASSWORD` (the code-server login) on
+> first visit. The manager UI/API bind to `127.0.0.1` only — never expose
+> port `5173` or `8080` directly.
 
 ### Private hosting (WARP-only)
 

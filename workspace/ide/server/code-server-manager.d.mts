@@ -1,5 +1,3 @@
-import type { IncomingMessage } from 'node:http'
-
 export interface CodeServerStatus {
   state: 'stopped' | 'starting' | 'running' | 'error'
   lastError: string | null
@@ -13,15 +11,9 @@ export interface CodeServerManager {
   start(): CodeServerStatus
   stop(): CodeServerStatus
   status(): CodeServerStatus
-  apiAuthorized(req: IncomingMessage): boolean
-  login(attempt: unknown): string | null
-  logout(token: string | null): void
-  sessionTokenFromReq(req: IncomingMessage): string | null
-  sessionCookieHeader(token: string, secure: boolean): string
 }
 
 export function loadDotEnv(path?: string): Record<string, string>
-export function createRateLimiter(options: { windowMs: number; max: number }): (key: string) => boolean
 export function createCodeServerManager(options?: {
   rootDir?: string
   logger?: Pick<Console, 'log' | 'error'>
