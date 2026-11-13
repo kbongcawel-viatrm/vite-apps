@@ -8,18 +8,10 @@ interface Status {
 }
 
 const app = document.querySelector<HTMLDivElement>('#app')!
-const KEY = 'vite-apps-key'
-
-function authHeaders(): Record<string, string> {
-  const k = sessionStorage.getItem(KEY)
-  return k ? { Authorization: `Bearer ${k}` } : {}
-}
 
 async function api(path: string, opts: RequestInit = {}): Promise<Response> {
-  return fetch(path, {
-    ...opts,
-    headers: { ...authHeaders(), ...(opts.headers || {}) },
-  })
+  // Session cookie is sent automatically (same-origin fetch).
+  return fetch(path, opts)
 }
 
 let authed = false
@@ -42,14 +34,15 @@ function showLogin(message = '') {
   form.onsubmit = async (e) => {
     e.preventDefault()
     const pw = (document.getElementById('pw') as HTMLInputElement).value
-    const r = await api('/api/code-server/verify', {
+    const r = await api('/api/code-server/login', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${pw}` },
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
     })
     if (r.status === 401) { showLogin('Incorrect password — try again.'); return }
-    sessionStorage.setItem(KEY, pw)
-    authed = true
-    refresh()
+    if (r.status === 429) { showLogin('Too many attempts — wait a minute.'); return }
+    if (!r.ok) { showLogin('Sign-in failed — try again.'); return }
+    location.reload()
   }
 }
 
@@ -84,9 +77,9 @@ async function refresh() {
     </main>`
 
   document.getElementById('refresh')!.onclick = refresh
-  document.getElementById('logout')!.onclick = () => {
-    sessionStorage.removeItem(KEY)
-    showLogin()
+  document.getElementById('logout')!.onclick = async () => {
+    await api('/api/code-server/logout', { method: 'POST' })
+    location.reload()
   }
   document.getElementById('start')?.addEventListener('click', async () => {
     const r = await api('/api/code-server/start', { method: 'POST' })

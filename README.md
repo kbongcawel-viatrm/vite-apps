@@ -108,7 +108,7 @@ npm run dev        # UI on :5173, autostarts code-server
 Then open **<http://localhost:5173>** — the manager dashboard:
 
 <p align="center">
-  <img src="assets/manager-ui.svg" alt="vite-apps manager dashboard at localhost:5173 showing status running, PID, workspace, editor link, and Stop/Refresh buttons" width="80%"/>
+  <img src="assets/manager-ui.svg" alt="vite-apps manager dashboard at localhost:5173 showing status running, editor link, and Start/Stop/Refresh buttons" width="80%"/>
 </p>
 
 1. Check the **Status** badge — it should read `running` (autostarted by `npm run dev`)
@@ -141,18 +141,18 @@ same Node process that owns the edge proxy. It polls
 | Element | What it does |
 |---|---|
 | **Status badge** | `stopped` · `starting` · `running` · `error` — live state of code-server |
-| **PID** | Process ID of the running code-server instance (when running) |
-| **Workspace** | Folder opened in the editor (`CODE_SERVER_WORKSPACE`) |
 | **Editor** | Deep link to `PUBLIC_EDITOR_URL` — opens the login page in a new tab |
-| **Start / Stop** | `POST /api/code-server/start` / `/stop` — require `Authorization: Bearer <PASSWORD>` |
+| **Start / Stop** | `POST /api/code-server/start` / `/stop` — require a valid session |
 | **Refresh** | Force an immediate status re-fetch |
+| **Sign out** | `POST /api/code-server/logout` — clears the session cookie |
 
-Mutating endpoints are authenticated with the same `PASSWORD` from `.env`
-that code-server uses (timing-safe comparison). The dashboard prompts for it
-once and keeps it in `sessionStorage` for the tab session. Error states
-surface in plain language in the **Error** row — e.g. a missing `PASSWORD`
-shows a `Config` warning, and proxy failures show the underlying `listen`
-error.
+The whole UI is gated: unauthenticated visitors get a sign-in page and no
+static assets are served. `POST /api/code-server/login` accepts the same
+`PASSWORD` from `.env` that code-server uses (timing-safe comparison,
+rate-limited to 5 attempts/min/IP) and sets an `HttpOnly; SameSite=Strict`
+session cookie (12 h TTL, `Secure` when served over HTTPS). API clients can
+alternatively send `Authorization: Bearer <PASSWORD>` directly. Sessions
+are in-memory and die with the process.
 
 ---
 
@@ -255,10 +255,12 @@ Manage with `podman-compose ps|logs|down`.
 | `https://manager.home-security.uk` | manager UI — status/start/stop dashboard |
 | `http://localhost:5173` / `:8080` | same services, local only |
 
-> 🔐 `manager.home-security.uk` is protected by the **same `PASSWORD`** as
-> the code-server login: mutating endpoints (`/api/code-server/start|stop|verify`)
-> require an `Authorization: Bearer` token, and the UI prompts for the
-> password once per session. `/status` stays public (read-only).
+> 🔐 `manager.home-security.uk` is gated end-to-end: unauthenticated
+> requests receive a sign-in page (no HTML/JS/assets are served), and
+> `POST /api/code-server/login` issues an `HttpOnly` session cookie after
+> checking the same `PASSWORD` used by the code-server login. All
+> `/api/code-server/*` endpoints accept the session cookie or a
+> `Bearer <PASSWORD>` token.
 > For an extra layer, put [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) in front of the hostname.
 
 ### Private hosting (WARP-only)

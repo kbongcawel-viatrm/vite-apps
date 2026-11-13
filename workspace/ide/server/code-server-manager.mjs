@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, createWriteStream, readFileSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import httpProxy from 'http-proxy'
-import { timingSafeEqual } from 'node:crypto'
+import { timingSafeEqual, randomBytes } from 'node:crypto'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 // server/ -> ide/ -> workspace/ -> repo root
@@ -50,7 +50,7 @@ const SECURITY_HEADERS = {
 }
 
 /** Fixed-window per-IP rate limiter. */
-function createRateLimiter({ windowMs, max }) {
+export function createRateLimiter({ windowMs, max }) {
   const hits = new Map()
   return function allow(ip) {
     const now = Date.now()
@@ -283,16 +283,63 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
   }
 
   // Manager API auth: every /api/code-server endpoint (including read-only
-  // /status) requires `Authorization: Bearer <PASSWORD>` — the same secret
-  // code-server uses for login. The UI already sends the header and falls
-  // back to the unlock form on 401.
-  function apiAuthorized(req) {
-    if (!password) return false
-    const m = (req.headers['authorization'] || '').match(/^Bearer\s+(.+)$/i)
-    if (!m) return false
-    const a = Buffer.from(m[1])
+  // /status) requires either `Authorization: Bearer <PASSWORD>` — the same
+  // secret code-server uses for login — or a valid session cookie issued by
+  // /api/code-server/login. Sessions are random bearer tokens kept in
+  // memory; they die with the process.
+  const SESSION_COOKIE = 'vite_apps_session'
+  const SESSION_TTL_MS = 12 * 60 * 60 * 1000
+  const sessions = new Map() // token -> expiresAt
+
+  function sessionTokenFromReq(req) {
+    const header = req.headers.cookie || ''
+    for (const part of header.split(';')) {
+      const [k, ...rest] = part.trim().split('=')
+      if (k === SESSION_COOKIE) return rest.join('=')
+    }
+    return null
+  }
+
+  function sessionValid(token) {
+    if (!token) return false
+    const exp = sessions.get(token)
+    if (!exp) return false
+    if (exp < Date.now()) { sessions.delete(token); return false }
+    return true
+  }
+
+  function passwordMatches(attempt) {
+    if (!password || typeof attempt !== 'string') return false
+    const a = Buffer.from(attempt)
     const b = Buffer.from(password)
     return a.length === b.length && timingSafeEqual(a, b)
+  }
+
+  function login(attempt) {
+    if (!passwordMatches(attempt)) return null
+    const token = randomBytes(32).toString('base64url')
+    sessions.set(token, Date.now() + SESSION_TTL_MS)
+    return token
+  }
+
+  function logout(token) {
+    if (token) sessions.delete(token)
+  }
+
+  function sessionCookieHeader(token, secure) {
+    const attrs = [
+      `${SESSION_COOKIE}=${token}`,
+      'Path=/', 'HttpOnly', 'SameSite=Strict',
+      `Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`,
+    ]
+    if (secure) attrs.push('Secure')
+    return attrs.join('; ')
+  }
+
+  function apiAuthorized(req) {
+    const m = (req.headers['authorization'] || '').match(/^Bearer\s+(.+)$/i)
+    if (m && passwordMatches(m[1])) return true
+    return sessionValid(sessionTokenFromReq(req))
   }
 
   function status() {
@@ -306,5 +353,5 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
     }
   }
 
-  return { start, stop, status, apiAuthorized }
+  return { start, stop, status, apiAuthorized, login, logout, sessionTokenFromReq, sessionCookieHeader }
 }
