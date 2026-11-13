@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "skills": {
+    "code-server-setup": {
+      "source": "zocomputer/skills",
+      "sourceType": "github",
+      "skillPath": "Official/zo-code-server-setup/SKILL.md",
+      "computedHash": "b0df21bae0e14d7f062c93f945f3edb10b64eef8d79d7d9ab8234cd99a70a613"
+    },
+    "react-vite-dashboard": {
+      "source": "google-labs-code/stitch-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/stitch-build/skills/react-vite-dashboard/SKILL.md",
+      "computedHash": "51579332c6abffcbf325e91a63468f4fd44216abc2187ad24ead213fe8f19800"
+    },
+    "vite": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "skillPath": "skills/vite/SKILL.md",
+      "computedHash": "db9eea82d8bf6ce0f60a4a1d94a626c718df7d97160b5f1d5b150647e0c401b3"
+    }
+  }
+}
