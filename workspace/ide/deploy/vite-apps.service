@@ -6,8 +6,11 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=%h/workspace/vite-apps
-# bash -lc picks up nvm from the login profile so node stays current across upgrades.
-ExecStart=/usr/bin/env bash -lc 'exec npm run server'
+# nvm is initialized lazily in .bashrc (unavailable to systemd), so pin the
+# node binary directly. Update this path after a node version upgrade:
+#   ls ~/.nvm/versions/node/
+Environment=PATH=%h/.nvm/versions/node/v26.13.1/bin:/usr/local/bin:/usr/bin
+ExecStart=%h/.nvm/versions/node/v26.13.1/bin/node workspace/ide/server/standalone.mjs
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true

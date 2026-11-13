@@ -21,6 +21,8 @@ body {
   box-shadow: 0 20px 50px rgb(0 0 0 / 0.4);
 }
 
+.card.login { width: min(380px, 92vw); }
+
 h1 { margin: 0; font-size: 1.6rem; }
 .sub { margin: 0.25rem 0 1.5rem; color: #94a3b8; }
 
