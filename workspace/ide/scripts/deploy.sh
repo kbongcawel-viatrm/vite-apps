@@ -60,6 +60,9 @@ if [ "$CONTAINERS_ONLY" -eq 0 ]; then
   # Start the standalone server detached if not already listening on :5173.
   if curl -sf -o /dev/null -m 2 http://127.0.0.1:5173/api/code-server/status; then
     echo "==> app already running on :5173 — skipping start"
+  elif systemctl --user cat vite-apps.service >/dev/null 2>&1; then
+    echo "==> starting app via systemd (vite-apps.service)"
+    systemctl --user restart vite-apps.service
   else
     echo "==> starting app (npm run server) detached"
     mkdir -p .code-server-data/logs

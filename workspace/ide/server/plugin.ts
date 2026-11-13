@@ -46,7 +46,12 @@ export function codeServerManager(): Plugin {
       res.setHeader('Cache-Control', 'no-store')
 
       if (url === '/status' && req.method === 'GET') {
-        res.end(JSON.stringify(manager!.status()))
+        if (!manager!.apiAuthorized(req)) {
+          res.statusCode = 401
+          res.end(JSON.stringify({ error: 'unauthorized' }))
+        } else {
+          res.end(JSON.stringify(manager!.status()))
+        }
       } else if (url === '/verify' && req.method === 'POST') {
         res.statusCode = manager!.apiAuthorized(req) ? 200 : 401
         res.end(JSON.stringify(manager!.apiAuthorized(req) ? { ok: true } : { error: 'unauthorized' }))

@@ -28,7 +28,14 @@ createServer((req, res) => {
     const action = url.slice('/api/code-server'.length)
     res.setHeader('Content-Type', 'application/json')
     res.setHeader('Cache-Control', 'no-store')
-    if (action === '/status' && req.method === 'GET') res.end(JSON.stringify(manager.status()))
+    if (action === '/status' && req.method === 'GET') {
+      if (!manager.apiAuthorized(req)) {
+        res.statusCode = 401
+        res.end(JSON.stringify({ error: 'unauthorized' }))
+      } else {
+        res.end(JSON.stringify(manager.status()))
+      }
+    }
     else if (action === '/verify' && req.method === 'POST') {
       const ok = manager.apiAuthorized(req)
       res.statusCode = ok ? 200 : 401

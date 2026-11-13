@@ -282,9 +282,10 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
     return status()
   }
 
-  // Manager API auth: mutating endpoints require `Authorization: Bearer
-  // <PASSWORD>` — the same secret code-server uses for login. /status stays
-  // public (read-only; already reports passwordConfigured).
+  // Manager API auth: every /api/code-server endpoint (including read-only
+  // /status) requires `Authorization: Bearer <PASSWORD>` — the same secret
+  // code-server uses for login. The UI already sends the header and falls
+  // back to the unlock form on 401.
   function apiAuthorized(req) {
     if (!password) return false
     const m = (req.headers['authorization'] || '').match(/^Bearer\s+(.+)$/i)

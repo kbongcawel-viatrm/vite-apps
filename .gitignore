@@ -154,12 +154,9 @@ bin/
 .code-server-data/
 vendor/
 
-# workspace/ holds the two projects (tracked) plus any scratch dirs the IDE
-# opens (ignored). bin/ and vendor/ inside workspace/ide stay ignored via the
-# patterns above.
-workspace/*
-!workspace/mgmt-dashboard/
-!workspace/ide/
+# workspace/ contents are tracked (mgmt-dashboard, ide, and any future
+# project dirs). Runtime dirs stay ignored via the patterns above:
+# bin/, vendor/, dist/, node_modules/, .code-server-data/.
 
 # Cloudflare tunnel credentials (never commit)
 **/deploy/cloudflared/credentials.json
