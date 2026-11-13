@@ -9,11 +9,7 @@ import { createServer } from 'node:http'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { join, extname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { randomBytes } from 'node:crypto'
-import {
-  createCodeServerManager, createRateLimiter, loadDotEnv,
-  githubAuthorizeUrl, githubOAuthLogin,
-} from './code-server-manager.mjs'
+import { createCodeServerManager, createRateLimiter, loadDotEnv } from './code-server-manager.mjs'
 
 // server/ -> ide/ -> workspace/ -> repo root
 const ROOT = resolve(fileURLToPath(new URL('../../..', import.meta.url)))
@@ -27,7 +23,7 @@ const MIME = {
   '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.map': 'application/json',
 }
 
-const LOGIN_PAGE = (oauthEnabled) => `<!doctype html>
+const LOGIN_PAGE = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>vite-apps — sign in</title>
 <style>
@@ -41,7 +37,7 @@ const LOGIN_PAGE = (oauthEnabled) => `<!doctype html>
   button:hover{background:#2c6aa0;border-color:#2c6aa0;color:#fff}
   .err{color:#c62828;font-size:.85rem;min-height:1.2em;margin:.5rem 0 0}
   .alt{margin:1rem 0 0;text-align:center}
-  .alt a{color:#3778b7;font-size:.9rem;text-decoration:none}
+  .alt a{display:inline-flex;align-items:center;gap:.5rem;color:#3778b7;font-size:.9rem;text-decoration:none}
   .alt a:hover{color:#009fff;text-decoration:underline}
   .hint{margin-top:1.25rem;font-size:.8rem;color:#9b9b9b}
 </style></head><body>
@@ -50,7 +46,6 @@ const LOGIN_PAGE = (oauthEnabled) => `<!doctype html>
 <input id="pw" type="password" autocomplete="current-password" required autofocus>
 <p class="err" id="err"></p>
 <button type="submit">Sign in</button></form>
-${oauthEnabled ? `<p class="alt"><a href="/api/code-server/auth/github">Sign in with GitHub</a></p>` : ''}
 <p class="hint">Uses the manager password from .env.</p></main>
 <script>
 document.getElementById('login').onsubmit = async (e) => {
@@ -63,8 +58,6 @@ document.getElementById('login').onsubmit = async (e) => {
   document.getElementById('err').textContent = 'Incorrect password — try again.'
 }
 </script></body></html>`
-
-const OAUTH_STATE_COOKIE = 'vite_apps_oauth_state'
 
 function isSecureRequest(req) {
   return Boolean(req.socket.encrypted) || req.headers['x-forwarded-proto'] === 'https'
@@ -80,21 +73,12 @@ function readBody(req) {
   })
 }
 
-function parseCookies(req) {
-  const out = {}
-  for (const part of String(req.headers.cookie || '').split(';')) {
-    const i = part.indexOf('=')
-    if (i > 0) out[part.slice(0, i).trim()] = part.slice(i + 1).trim()
-  }
-  return out
-}
-
 const manager = createCodeServerManager({ rootDir: ROOT })
 manager.start()
 const allowLogin = createRateLimiter({ windowMs: 60_000, max: 5 })
-const loginPage = LOGIN_PAGE(manager.oauthEnabled)
+const loginPage = LOGIN_PAGE
 
-createServer(async (req, res) => {
+createServer((req, res) => {
   const url = (req.url || '/').split('?')[0]
   const ip = req.socket.remoteAddress || ''
 
@@ -126,55 +110,6 @@ createServer(async (req, res) => {
       manager.logout(manager.sessionTokenFromReq(req))
       res.setHeader('Set-Cookie', 'vite_apps_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0')
       res.end(JSON.stringify({ ok: true }))
-      return
-    }
-
-    // GitHub OAuth — unauthenticated by design; issues the same session cookie.
-    if (action === '/auth/github' && req.method === 'GET') {
-      if (!manager.oauthEnabled) { res.statusCode = 404; res.end('{}'); return }
-      const state = randomBytes(16).toString('base64url')
-      const proto = isSecureRequest(req) ? 'https' : 'http'
-      const redirectUri = `${proto}://${req.headers.host}/api/code-server/auth/github/callback`
-      res.writeHead(302, {
-        Location: githubAuthorizeUrl({
-          clientId: manager.oauthConfig.clientId, redirectUri, state,
-        }),
-        'Set-Cookie': `${OAUTH_STATE_COOKIE}=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${isSecureRequest(req) ? '; Secure' : ''}`,
-      })
-      res.end()
-      return
-    }
-
-    if (action === '/auth/github/callback' && req.method === 'GET') {
-      const q = new URL(req.url, 'http://x').searchParams
-      const clearState = `${OAUTH_STATE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
-      const cookies = parseCookies(req)
-      if (!manager.oauthEnabled || q.get('state') !== cookies[OAUTH_STATE_COOKIE] || !q.get('code')) {
-        res.statusCode = 400
-        res.setHeader('Set-Cookie', clearState)
-        res.end(JSON.stringify({ error: 'oauth failed' }))
-        return
-      }
-      const ghLogin = await githubOAuthLogin({ ...manager.oauthConfig, code: q.get('code') })
-      if (!ghLogin || !manager.oauthConfig.allowedUsers.has(ghLogin.toLowerCase())) {
-        res.statusCode = 403
-        res.setHeader('Set-Cookie', clearState)
-        res.end(JSON.stringify({ error: ghLogin ? 'user not allowed' : 'github login failed' }))
-        return
-      }
-      const token = manager.createSession()
-      res.setHeader('Set-Cookie', [
-        clearState,
-        manager.sessionCookieHeader(token, isSecureRequest(req)),
-      ])
-      res.writeHead(302, { Location: '/' })
-      res.end()
-      return
-    }
-
-    // Public config for the login UI — reveals only whether OAuth is on.
-    if (action === '/config' && req.method === 'GET') {
-      res.end(JSON.stringify({ githubOAuth: manager.oauthEnabled }))
       return
     }
 

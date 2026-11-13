@@ -5,7 +5,6 @@ import { resolve, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import httpProxy from 'http-proxy'
 import { timingSafeEqual, randomBytes } from 'node:crypto'
-import { request as httpRequest } from 'node:http'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 // server/ -> ide/ -> workspace/ -> repo root
@@ -50,50 +49,6 @@ const SECURITY_HEADERS = {
   ].join('; '),
 }
 
-// ---------------------------------------------------------------------------
-// GitHub OAuth helpers (shared by the manager API and the edge proxy).
-// Enabled only when GITHUB_OAUTH_CLIENT_ID, GITHUB_OAUTH_CLIENT_SECRET and a
-// non-empty GITHUB_OAUTH_ALLOWED_USERS are all set.
-// ---------------------------------------------------------------------------
-
-const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize'
-const GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token'
-const GITHUB_USER_URL = 'https://api.github.com/user'
-
-export function parseAllowedUsers(raw) {
-  return new Set(String(raw || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean))
-}
-
-export function githubAuthorizeUrl({ clientId, redirectUri, state }) {
-  const u = new URL(GITHUB_AUTHORIZE_URL)
-  u.searchParams.set('client_id', clientId)
-  u.searchParams.set('redirect_uri', redirectUri)
-  u.searchParams.set('scope', 'read:user')
-  u.searchParams.set('state', state)
-  return u.toString()
-}
-
-/** Exchange an OAuth code for the GitHub login, or null on any failure. */
-export async function githubOAuthLogin({ clientId, clientSecret, code }) {
-  try {
-    const tokRes = await fetch(GITHUB_TOKEN_URL, {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
-    })
-    const tok = await tokRes.json()
-    if (!tok?.access_token) return null
-    const userRes = await fetch(GITHUB_USER_URL, {
-      headers: { Authorization: `Bearer ${tok.access_token}`, 'User-Agent': 'vite-apps' },
-    })
-    if (!userRes.ok) return null
-    const user = await userRes.json()
-    return user?.login ? String(user.login) : null
-  } catch {
-    return null
-  }
-}
-
 function parseCookies(req) {
   const out = {}
   for (const part of String(req.headers.cookie || '').split(';')) {
@@ -101,38 +56,6 @@ function parseCookies(req) {
     if (i > 0) out[part.slice(0, i).trim()] = part.slice(i + 1).trim()
   }
   return out
-}
-
-function requestIsSecure(req) {
-  return Boolean(req.socket.encrypted) || req.headers['x-forwarded-proto'] === 'https'
-}
-
-/** Base URL for OAuth redirect URIs, derived from the incoming request. */
-function requestBaseUrl(req) {
-  const proto = req.headers['x-forwarded-proto'] || (requestIsSecure(req) ? 'https' : 'http')
-  return `${proto}://${req.headers.host || 'localhost'}`
-}
-
-/** Perform a password login against the code-server backend; returns the
- *  value of its `code-server-session` cookie (the hashed password). */
-function codeServerBackendLogin(internalPort, password) {
-  return new Promise((resolveLogin) => {
-    const body = `password=${encodeURIComponent(password)}`
-    const r = httpRequest({
-      host: '127.0.0.1', port: internalPort, path: '/login?to=/', method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
-    }, (res) => {
-      const sc = res.headers['set-cookie'] || []
-      for (const c of sc) {
-        const m = String(c).match(/code-server-session=([^;]+)/)
-        if (m) { res.resume(); resolveLogin(m[1]); return }
-      }
-      res.resume()
-      resolveLogin(null)
-    })
-    r.on('error', () => resolveLogin(null))
-    r.end(body)
-  })
 }
 
 /** Fixed-window per-IP rate limiter. */
@@ -169,10 +92,6 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
   const edgeBind = get('EDGE_BIND', '127.0.0.1')
   const password = get('PASSWORD', '')
   const publicEditorUrl = get('PUBLIC_EDITOR_URL', `http://localhost:${edgePort}`)
-  const oauthClientId = get('GITHUB_OAUTH_CLIENT_ID', '')
-  const oauthClientSecret = get('GITHUB_OAUTH_CLIENT_SECRET', '')
-  const oauthAllowedUsers = parseAllowedUsers(get('GITHUB_OAUTH_ALLOWED_USERS', ''))
-  const oauthEnabled = Boolean(oauthClientId && oauthClientSecret && oauthAllowedUsers.size)
 
   let child = null
   let edgeServer = null
@@ -213,94 +132,6 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
     const allowLogin = createRateLimiter({ windowMs: 60_000, max: 5 })
     const allowGeneral = createRateLimiter({ windowMs: 60_000, max: 600 })
 
-    // Edge sessions for GitHub OAuth: token -> { expires, csCookie } where
-    // csCookie is the code-server session cookie value obtained by logging
-    // into the backend with PASSWORD on the user's behalf.
-    const EDGE_SESSION_TTL_MS = 12 * 60 * 60 * 1000
-    const edgeSessions = new Map()
-    const EDGE_COOKIE = 'vite_apps_edge'
-    const OAUTH_STATE_COOKIE = 'vite_apps_oauth_state'
-
-    function edgeSessionValid(token) {
-      const rec = token && edgeSessions.get(token)
-      if (!rec) return null
-      if (rec.expires < Date.now()) { edgeSessions.delete(token); return null }
-      return rec
-    }
-
-    function edgeCookieHeader(token, secure, maxAge) {
-      const attrs = [`${EDGE_COOKIE}=${token}`, 'Path=/', 'HttpOnly', 'SameSite=Lax']
-      if (maxAge != null) attrs.push(`Max-Age=${maxAge}`)
-      if (secure) attrs.push('Secure')
-      return attrs.join('; ')
-    }
-
-    async function handleOAuth(req, res, path, query) {
-      const secure = requestIsSecure(req)
-      const base = requestBaseUrl(req)
-
-      if (path === '/oauth/logout') {
-        const tok = parseCookies(req)[EDGE_COOKIE]
-        if (tok) edgeSessions.delete(tok)
-        res.writeHead(302, {
-          Location: '/login',
-          'Set-Cookie': `${EDGE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
-        })
-        res.end()
-        return true
-      }
-
-      if (path === '/oauth/start') {
-        const state = randomBytes(16).toString('base64url')
-        res.writeHead(302, {
-          Location: githubAuthorizeUrl({
-            clientId: oauthClientId,
-            redirectUri: `${base}/oauth/callback`,
-            state,
-          }),
-          'Set-Cookie': `${OAUTH_STATE_COOKIE}=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${secure ? '; Secure' : ''}`,
-        })
-        res.end()
-        return true
-      }
-
-      if (path === '/oauth/callback') {
-        const cookies = parseCookies(req)
-        const stateOk = query.get('state') && query.get('state') === cookies[OAUTH_STATE_COOKIE]
-        const clearState = `${OAUTH_STATE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
-        if (!stateOk || !query.get('code')) {
-          res.writeHead(400, { 'Content-Type': 'text/plain', 'Set-Cookie': clearState })
-          res.end('OAuth state mismatch or missing code')
-          return true
-        }
-        const ghLogin = await githubOAuthLogin({
-          clientId: oauthClientId, clientSecret: oauthClientSecret, code: query.get('code'),
-        })
-        if (!ghLogin || !oauthAllowedUsers.has(ghLogin.toLowerCase())) {
-          res.writeHead(403, { 'Content-Type': 'text/plain', 'Set-Cookie': clearState })
-          res.end(ghLogin ? `GitHub user @${ghLogin} is not allowed` : 'GitHub login failed')
-          return true
-        }
-        const csCookie = await codeServerBackendLogin(internalPort, password)
-        if (!csCookie) {
-          res.writeHead(502, { 'Content-Type': 'text/plain', 'Set-Cookie': clearState })
-          res.end('Could not establish editor session')
-          return true
-        }
-        const token = randomBytes(32).toString('base64url')
-        edgeSessions.set(token, { expires: Date.now() + EDGE_SESSION_TTL_MS, csCookie })
-        if (edgeSessions.size > 1000) edgeSessions.clear()
-        res.writeHead(302, {
-          Location: '/',
-          'Set-Cookie': [clearState, edgeCookieHeader(token, secure, Math.floor(EDGE_SESSION_TTL_MS / 1000))],
-        })
-        res.end()
-        return true
-      }
-
-      return false
-    }
-
     proxy = httpProxy.createProxyServer({
       target: `http://127.0.0.1:${internalPort}`,
       ws: true,
@@ -315,20 +146,6 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
       }
     })
 
-    // Forward the request upstream, injecting the code-server session cookie
-    // when the caller authenticated via GitHub OAuth at the edge.
-    function injectEdgeSession(req) {
-      const cookies = parseCookies(req)
-      const rec = edgeSessionValid(cookies[EDGE_COOKIE])
-      if (!rec) return false
-      const parts = Object.entries(cookies)
-        .filter(([k]) => k !== 'code-server-session' && k !== EDGE_COOKIE && k !== OAUTH_STATE_COOKIE)
-        .map(([k, v]) => `${k}=${v}`)
-      parts.push(`code-server-session=${rec.csCookie}`)
-      req.headers.cookie = parts.join('; ')
-      return true
-    }
-
     proxy.on('proxyRes', (proxyRes, req, res) => {
       if (!req.__rewriteLogin) return
       const chunks = []
@@ -339,9 +156,10 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
         const isHtml = String(headers['content-type'] || '').includes('text/html')
         const encoded = headers['content-encoding'] && headers['content-encoding'] !== 'identity'
         if (isHtml && !encoded) {
-          const html = body.toString('utf8')
+          let html = body.toString('utf8')
           if (html.includes('Password was set from')) {
-            body = Buffer.from(html.replace(/<div class="sub">[\s\S]*?<\/div>/, ''), 'utf8')
+            html = html.replace(/<div class="sub">[\s\S]*?<\/div>/, '')
+            body = Buffer.from(html, 'utf8')
             delete headers['content-length']
           }
         }
@@ -352,21 +170,10 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
 
     edgeServer = createServer((req, res) => {
       const ip = req.socket.remoteAddress || 'unknown'
-      const [path, qs] = (req.url || '/').split('?')
-      const query = new URLSearchParams(qs || '')
+      const path = (req.url || '/').split('?')[0]
 
       for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v)
       res.removeHeader?.('Server')
-
-      if (oauthEnabled && path.startsWith('/oauth/')) {
-        handleOAuth(req, res, path, query)
-          .then((handled) => { if (!handled) { res.writeHead(404); res.end('not found') } })
-          .catch((e) => {
-            logger.error('[edge] oauth error:', e.message)
-            if (!res.headersSent) { res.writeHead(500); res.end('oauth error') }
-          })
-        return
-      }
 
       // Rate-limit the credential endpoint aggressively; everything else loosely.
       const isLogin = req.method === 'POST' && path === '/login'
@@ -375,24 +182,6 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
         res.writeHead(429, { 'Content-Type': 'text/plain', 'Retry-After': '60' })
         res.end('Too many requests')
         return
-      }
-
-      if (oauthEnabled) {
-        const cookies = parseCookies(req)
-        if (!injectEdgeSession(req)) {
-          const hasBackendSession = Boolean(cookies['code-server-session'])
-          const isPasswordPath = path === '/login'
-          if (!hasBackendSession && !isPasswordPath) {
-            if (req.method === 'GET' || req.method === 'HEAD') {
-              res.writeHead(302, { Location: '/oauth/start' })
-              res.end()
-            } else {
-              res.writeHead(401, { 'Content-Type': 'text/plain' })
-              res.end('Unauthorized')
-            }
-            return
-          }
-        }
       }
 
       // Strip the "$PASSWORD" hint from the code-server login page. Force an
@@ -404,7 +193,7 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
     })
 
     edgeServer.on('upgrade', (req, socket, head) => {
-      if (oauthEnabled && !parseCookies(req)['code-server-session'] && !injectEdgeSession(req)) {
+      if (!parseCookies(req)['code-server-session']) {
         socket.destroy()
         return
       }
@@ -472,7 +261,7 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
       '--disable-workspace-trust',
       '--user-data-dir', join(dataDir, 'user'),
       '--extensions-dir', join(dataDir, 'extensions'),
-      '--welcome-text', 'vite-apps secure code mode',
+      '--welcome-text', 'Authentication required',
       workspaceDir,
     ]
 
@@ -612,8 +401,5 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
   return {
     start, stop, status, apiAuthorized, login, logout,
     sessionTokenFromReq, sessionCookieHeader,
-    createSession: issueSession,
-    oauthEnabled,
-    oauthConfig: { clientId: oauthClientId, clientSecret: oauthClientSecret, allowedUsers: oauthAllowedUsers },
   }
 }

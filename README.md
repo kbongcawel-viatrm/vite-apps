@@ -154,13 +154,13 @@ session cookie (12 h TTL, `Secure` when served over HTTPS). API clients can
 alternatively send `Authorization: Bearer <PASSWORD>` directly. Sessions
 are in-memory and die with the process.
 
-**GitHub OAuth (optional):** set `GITHUB_OAUTH_CLIENT_ID`,
-`GITHUB_OAUTH_CLIENT_SECRET`, and `GITHUB_OAUTH_ALLOWED_USERS` (comma-separated
-GitHub usernames) in `.env` to add a "Sign in with GitHub" button. The same
-allowlist gates both the manager and the editor — for the editor, the edge
-proxy completes OAuth and silently logs into code-server with `PASSWORD`,
-so users never see the password form. Register the callback URLs shown in
-`.env.example`. Password login remains available as the fallback.
+**Cloudflare Access (SSO):** both public hostnames are fronted by a
+[Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/)
+self-hosted application (`ide.` + `manager.home-security.uk`) on the
+`home-security-xyz` team domain. Visitors authenticate with the configured
+identity providers (GitHub, Google, one-time PIN) against the account's
+allow policy **before** reaching the app — the app-level `PASSWORD` login
+remains as the second layer. Access sessions last 24 h.
 
 ---
 
@@ -263,13 +263,14 @@ Manage with `podman-compose ps|logs|down`.
 | `https://manager.home-security.uk` | manager UI — status/start/stop dashboard |
 | `http://localhost:5173` / `:8080` | same services, local only |
 
-> 🔐 `manager.home-security.uk` is gated end-to-end: unauthenticated
-> requests receive a sign-in page (no HTML/JS/assets are served), and
-> `POST /api/code-server/login` issues an `HttpOnly` session cookie after
-> checking the same `PASSWORD` used by the code-server login. All
-> `/api/code-server/*` endpoints accept the session cookie or a
-> `Bearer <PASSWORD>` token.
-> For an extra layer, put [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) in front of the hostname.
+> 🔐 Public access is double-gated: **Cloudflare Access** (SSO via the
+> `home-security-xyz` team domain — GitHub/Google/OTP, allow-listed emails)
+> runs before any request reaches the tunnel, and the app itself requires
+> `PASSWORD` — the manager issues an `HttpOnly; SameSite=Strict` session
+> cookie (12 h TTL, `Secure` over HTTPS) via `POST /api/code-server/login`
+> (timing-safe, rate-limited 5/min/IP), and code-server asks for the same
+> password on first editor visit. All `/api/code-server/*` endpoints accept
+> the session cookie or `Authorization: Bearer <PASSWORD>`.
 
 ### Private hosting (WARP-only)
 

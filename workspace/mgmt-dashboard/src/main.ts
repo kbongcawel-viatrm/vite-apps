@@ -18,11 +18,6 @@ let authed = false
 
 async function showLogin(message = '') {
   authed = false
-  let githubOAuth = false
-  try {
-    const cfg = await api('/api/code-server/config')
-    if (cfg.ok) githubOAuth = Boolean((await cfg.json()).githubOAuth)
-  } catch { /* config endpoint unavailable — hide the link */ }
   app.innerHTML = `
     <main class="card login">
       <h1>vite-apps</h1>
@@ -33,7 +28,6 @@ async function showLogin(message = '') {
         ${message ? `<p class="row error"><span></span><span>${escapeHtml(message)}</span></p>` : ''}
         <div class="actions"><button class="primary" type="submit">Sign in</button></div>
       </form>
-      ${githubOAuth ? `<p class="alt"><a href="/api/code-server/auth/github">Sign in with GitHub</a></p>` : ''}
       <p class="hint">Uses the manager password from .env.</p>
     </main>`
   const form = document.getElementById('login') as HTMLFormElement
