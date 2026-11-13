@@ -51,8 +51,7 @@ wait_for() { # wait_for <name> <curl-url> <timeout-s>
 
 # --- 1+2: build & start the vite app ----------------------------------------
 if [ "$CONTAINERS_ONLY" -eq 0 ]; then
-  [ -f .env ] || { echo "error: .env missing — cp .env.example .env and set PASSWORD" >&2; exit 1; }
-  grep -q '^PASSWORD=.' .env || { echo "error: PASSWORD not set in .env" >&2; exit 1; }
+  [ -f .env ] || { echo "error: .env missing — cp .env.example .env" >&2; exit 1; }
 
   echo "==> npm run build"
   npm run build

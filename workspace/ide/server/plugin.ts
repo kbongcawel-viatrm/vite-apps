@@ -4,8 +4,9 @@ import { createCodeServerManager } from './code-server-manager.mjs'
 /**
  * Vite plugin that manages a hardened local code-server instance.
  *
- * - Spawns code-server bound to 127.0.0.1 only, password auth via $PASSWORD
- *   (never on the command line), telemetry/update checks disabled.
+ * - Spawns code-server bound to 127.0.0.1 only with `--auth none`
+ *   (public access is gated upstream by Cloudflare Access SSO), telemetry
+ *   and update checks disabled.
  * - Fronts it with a hardened edge proxy (security headers, login rate
  *   limiting, WebSocket support) on EDGE_PORT/EDGE_BIND from .env.
  * - Exposes /api/code-server/{status,start,stop} to the management UI.

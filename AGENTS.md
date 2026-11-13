@@ -34,5 +34,5 @@ podman-compose -f workspace/ide/compose.yaml ps|logs|down
 ```
 
 Public URLs (Cloudflare Tunnel): `https://ide.home-security.uk` (editor),
-`https://manager.home-security.uk` (manager UI) — both gated by Cloudflare
-Access SSO; the editor additionally requires `PASSWORD` at code-server login.
+`https://manager.home-security.uk` (manager UI) — both gated solely by
+Cloudflare Access SSO; code-server runs `--auth none` on localhost.

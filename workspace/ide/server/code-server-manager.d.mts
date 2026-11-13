@@ -3,7 +3,6 @@ export interface CodeServerStatus {
   lastError: string | null
   editorUrl: string
   workspaceDir: string
-  passwordConfigured: boolean
   pid: number | null
 }
 

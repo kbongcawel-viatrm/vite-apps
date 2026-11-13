@@ -4,7 +4,7 @@
 
 # ⚡ vite-apps
 
-**A Vite app that runs a hardened, password-protected [code-server](https://github.com/coder/code-server)** — VS Code in the browser — behind a security-conscious edge proxy, with a small management UI to start, stop, and monitor it.
+**A Vite app that runs [code-server](https://github.com/coder/code-server)** — VS Code in the browser — behind a hardened edge proxy and Cloudflare Access SSO, with a small management UI to start, stop, and monitor it.
 
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![Vite](https://img.shields.io/badge/vite-8-646cff?logo=vite&logoColor=white)](https://vite.dev)
@@ -38,7 +38,7 @@
 |---|---|
 | 🖥️ **Browser IDE** | Full VS Code experience via code-server — no install, works over SSH or on a NAS |
 | 🛡️ **Hardened proxy** | Edge layer adds CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, and login rate limiting |
-| 🔒 **Password auth** | `code-server --auth password` — secret passed via env var, never on the command line |
+| 🔐 **SSO-gated** | Cloudflare Access authenticates before traffic reaches the tunnel; code-server runs `--auth none` on localhost |
 | 📊 **Manager UI** | Tiny Vite dashboard to check status, start/stop the server, and grab the editor link |
 | 🔕 **Privacy-first** | Telemetry and update checks disabled; user data & extensions persist in `.code-server-data/` |
 | 🚢 **One-command prod** | `npm run build && npm run server` — serves `dist/` and manages code-server with no dev server |
@@ -57,7 +57,7 @@ browser ──> edge proxy (:8080)         security headers + login rate limit +
 
 - **code-server** binds to `127.0.0.1:18080` — never directly reachable.
 - The **edge proxy** (same Node process as the Vite plugin) is the only public surface.
-- Auth is `code-server --auth password` with the password passed via the `PASSWORD` env var — **never** on the command line.
+- code-server runs `--auth none` bound to `127.0.0.1` — authentication happens upstream at Cloudflare Access; nothing listens publicly without SSO.
 - Telemetry and update checks are disabled; workspace trust is off; user data and extensions live under `.code-server-data/`.
 
 ---
@@ -101,7 +101,6 @@ All runtime state (`.env`, `.code-server-data/`) stays at the repo root.
 ```bash
 npm install
 cp .env.example .env
-# set a strong PASSWORD in .env, e.g.: openssl rand -base64 24
 npm run dev        # UI on :5173, autostarts code-server
 ```
 
@@ -113,11 +112,7 @@ Then open **<http://localhost:5173>** — the manager dashboard:
 
 1. Check the **Status** badge — it should read `running` (autostarted by `npm run dev`)
 2. Click the **Editor** link, or open <http://localhost:8080> directly
-3. Log in with `PASSWORD` from your `.env`:
-
-<p align="center">
-  <img src="assets/login-page.svg" alt="code-server password login page behind the hardened edge proxy" width="80%"/>
-</p>
+3. Open <http://localhost:8080> directly — the VS Code workbench loads with no login (auth is handled by Cloudflare Access in production).
 
 <details>
 <summary>📦 Install the code-server binary manually</summary>
@@ -149,8 +144,7 @@ same Node process that owns the edge proxy. It polls
 The dashboard is intentionally minimal: **Status** and the **Editor** URL
 only. Public access is gated entirely by **Cloudflare Access** (see below);
 the app itself binds to `127.0.0.1` and its management API is reachable only
-from localhost or through the tunnel. The editor still requires `PASSWORD`
-at the code-server login.
+from localhost or through the tunnel.
 
 ---
 
@@ -163,7 +157,6 @@ All settings live in `.env` (see [`.env.example`](.env.example)):
 | `VITE_PORT` | `5173` | Management UI port |
 | `EDGE_PORT` / `EDGE_BIND` | `8080` / `127.0.0.1` | Public proxy address |
 | `CODE_SERVER_PORT` | `18080` | Internal code-server port (localhost only) |
-| `PASSWORD` | — | **Required.** Editor login password |
 | `CODE_SERVER_WORKSPACE` | `./workspace` | Folder opened in the editor |
 | `PUBLIC_EDITOR_URL` | `http://localhost:8080` | URL shown in the UI |
 | `CODE_SERVER_AUTOSTART` | `1` | Set `0` to disable autostart on `vite dev`/`preview` |
@@ -249,16 +242,16 @@ Manage with `podman-compose ps|logs|down`.
 
 | URL | What |
 |---|---|
-| `https://ide.home-security.uk` | code-server editor (password protected) |
+| `https://ide.home-security.uk` | code-server editor (Access SSO) |
 | `https://manager.home-security.uk` | manager UI — status/start/stop dashboard |
 | `http://localhost:5173` / `:8080` | same services, local only |
 
 > 🔐 Public access is gated by **Cloudflare Access** (SSO via the
 > `home-security-xyz` team domain — GitHub/Google/OTP, allow-listed emails)
 > before any request reaches the tunnel; sign out from the Access session.
-> The editor itself still asks for `PASSWORD` (the code-server login) on
-> first visit. The manager UI/API bind to `127.0.0.1` only — never expose
-> port `5173` or `8080` directly.
+> code-server runs `--auth none` on `127.0.0.1` — SSO is the only gate.
+> The manager UI/API bind to `127.0.0.1` only — never expose port `5173`
+> or `8080` directly.
 
 ### Private hosting (WARP-only)
 
@@ -292,7 +285,6 @@ npm run build && npm run server   # serves workspace/mgmt-dashboard/dist + manag
 |---|---|---|
 | UI loads on `:5174` (or higher) with an `edge proxy failed: EADDRINUSE` error | A second `npm run dev` auto-incremented the Vite port but can't bind `EDGE_PORT` `8080` — only one instance can own the proxy | Use the lowest port (`:5173`); kill duplicates with `pkill -f "vite"` or `kill <pid>` |
 | Status stuck on `starting` | code-server still booting | Wait a few seconds and hit **Refresh**; check `.code-server-data/logs/code-server.log` |
-| `Config` warning: `Set PASSWORD in .env` | `PASSWORD` missing | Add it to `.env` and restart `npm run dev` |
 | Editor link unreachable | code-server stopped or proxy down | Start it from the manager; verify `EDGE_PORT` isn't firewalled |
 | Port `8080` already in use | Another service holds the edge port | Change `EDGE_PORT` in `.env` and update `PUBLIC_EDITOR_URL` |
 
@@ -303,7 +295,7 @@ To make duplicate dev servers **fail loudly** instead of silently landing on
 
 ## 🔐 Security notes
 
-- code-server grants **full shell access** to anyone who logs in — treat `PASSWORD` like a root password: keep it unique and rotate it if exposed.
+- code-server grants **full shell access** to anyone who reaches it — Cloudflare Access is the only gate, so keep the allow policy tight and treat Access sessions like shell access.
 - `.env`, `vendor/`, `.code-server-data/`, `workspace/` are gitignored — **never commit them**.
 - The CSP allows `'unsafe-inline'`/`'unsafe-eval'` because VS Code's web workbench requires them; everything else is locked down (`frame-ancestors 'none'`, `base-uri 'self'`, restrictive `Permissions-Policy`).
 

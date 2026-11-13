@@ -48,15 +48,6 @@ const SECURITY_HEADERS = {
   ].join('; '),
 }
 
-function parseCookies(req) {
-  const out = {}
-  for (const part of String(req.headers.cookie || '').split(';')) {
-    const i = part.indexOf('=')
-    if (i > 0) out[part.slice(0, i).trim()] = part.slice(i + 1).trim()
-  }
-  return out
-}
-
 /** Fixed-window per-IP rate limiter. */
 export function createRateLimiter({ windowMs, max }) {
   const hits = new Map()
@@ -89,7 +80,6 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
   const internalPort = Number(get('CODE_SERVER_PORT', '18080'))
   const edgePort = Number(get('EDGE_PORT', '8080'))
   const edgeBind = get('EDGE_BIND', '127.0.0.1')
-  const password = get('PASSWORD', '')
   const publicEditorUrl = get('PUBLIC_EDITOR_URL', `http://localhost:${edgePort}`)
 
   let child = null
@@ -145,28 +135,6 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
       }
     })
 
-    proxy.on('proxyRes', (proxyRes, req, res) => {
-      if (!req.__rewriteLogin) return
-      const chunks = []
-      proxyRes.on('data', (c) => chunks.push(c))
-      proxyRes.on('end', () => {
-        const headers = { ...proxyRes.headers }
-        let body = Buffer.concat(chunks)
-        const isHtml = String(headers['content-type'] || '').includes('text/html')
-        const encoded = headers['content-encoding'] && headers['content-encoding'] !== 'identity'
-        if (isHtml && !encoded) {
-          let html = body.toString('utf8')
-          if (html.includes('Password was set from')) {
-            html = html.replace(/<div class="sub">[\s\S]*?<\/div>/, '')
-            body = Buffer.from(html, 'utf8')
-            delete headers['content-length']
-          }
-        }
-        res.writeHead(proxyRes.statusCode || 502, headers)
-        res.end(body)
-      })
-    })
-
     edgeServer = createServer((req, res) => {
       const ip = req.socket.remoteAddress || 'unknown'
       const path = (req.url || '/').split('?')[0]
@@ -183,19 +151,10 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
         return
       }
 
-      // Strip the "$PASSWORD" hint from the code-server login page. Force an
-      // identity response so the HTML can be rewritten (clients may send
-      // Accept-Encoding: gzip, br through the Cloudflare/Caddy chain).
-      req.__rewriteLogin = (req.method === 'GET' || req.method === 'POST') && path === '/login'
-      if (req.__rewriteLogin) delete req.headers['accept-encoding']
-      proxy.web(req, res, { selfHandleResponse: req.__rewriteLogin })
+      proxy.web(req, res)
     })
 
     edgeServer.on('upgrade', (req, socket, head) => {
-      if (!parseCookies(req)['code-server-session']) {
-        socket.destroy()
-        return
-      }
       proxy.ws(req, socket, head)
     })
 
@@ -215,11 +174,6 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
 
   function start() {
     if (child || launching || state === 'starting') return status()
-    if (!password) {
-      state = 'error'
-      lastError = 'PASSWORD is not set. Copy .env.example to .env and set a strong password.'
-      return status()
-    }
     state = 'starting'
     lastError = null
     launching = true
@@ -253,21 +207,19 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
 
     const args = [
       '--bind-addr', `127.0.0.1:${internalPort}`,
-      '--auth', 'password',
+      '--auth', 'none',
       '--cert', 'false',
       '--disable-telemetry',
       '--disable-update-check',
       '--disable-workspace-trust',
       '--user-data-dir', join(dataDir, 'user'),
       '--extensions-dir', join(dataDir, 'extensions'),
-      '--welcome-text', 'Authentication required',
       workspaceDir,
     ]
 
-    // Never pass the password on the command line; code-server reads $PASSWORD.
     const proc = spawn(bin, args, {
       cwd: rootDir,
-      env: { ...process.env, ...dotenv, PASSWORD: password },
+      env: { ...process.env, ...dotenv },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     child = proc
@@ -328,7 +280,6 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
       lastError,
       editorUrl: publicEditorUrl,
       workspaceDir,
-      passwordConfigured: Boolean(password),
       pid: child?.pid ?? null,
     }
   }
