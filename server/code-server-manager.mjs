@@ -202,20 +202,23 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
     ]
 
     // Never pass the password on the command line; code-server reads $PASSWORD.
-    child = spawn(bin, args, {
+    const proc = spawn(bin, args, {
       cwd: rootDir,
       env: { ...process.env, ...dotenv, PASSWORD: password },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
-    child.stdout.pipe(out)
-    child.stderr.pipe(err)
+    child = proc
+    proc.stdout.pipe(out)
+    proc.stderr.pipe(err)
 
-    child.on('error', (e) => {
+    proc.on('error', (e) => {
+      if (child !== proc) return
       state = 'error'
       lastError = e.message
       logger.error('[code-server] spawn error:', e.message)
     })
-    child.on('exit', (code, signal) => {
+    proc.on('exit', (code, signal) => {
+      if (child !== proc) return
       logger.log(`[code-server] exited code=${code} signal=${signal}`)
       child = null
       state = 'stopped'
@@ -229,16 +232,17 @@ export function createCodeServerManager({ rootDir = ROOT, logger = console } = {
 
     // Give code-server a moment, then mark running (it keeps running even if
     // the health check races startup; the proxy will 502 until ready).
-    setTimeout(() => { if (child) state = 'running' }, 1500)
+    setTimeout(() => { if (child === proc) state = 'running' }, 1500)
     return status()
   }
 
   function stop() {
-    if (child) {
-      child.kill('SIGTERM')
-      setTimeout(() => child && child.kill('SIGKILL'), 5000).unref()
-    }
+    const proc = child
     child = null
+    if (proc) {
+      proc.kill('SIGTERM')
+      setTimeout(() => { if (proc.exitCode === null && proc.signalCode === null) proc.kill('SIGKILL') }, 5000).unref()
+    }
     if (edgeServer) {
       edgeServer.close()
       edgeServer = null
