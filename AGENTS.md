@@ -1,5 +1,12 @@
 # Agent rules — vite-apps
 
+## Git pushes require operator approval
+
+**The operator is the sole gate for all code pushes.** Never run
+`git push` (or otherwise publish commits to a remote) without explicit
+approval for that specific push. The operator performs pushes themselves
+when ready; agents commit locally only.
+
 ## MCP mutations require approval
 
 **Always prompt the operator for explicit approval before any destructive or
@@ -27,4 +34,5 @@ podman-compose -f workspace/ide/compose.yaml ps|logs|down
 ```
 
 Public URLs (Cloudflare Tunnel): `https://ide.home-security.uk` (editor),
-`https://manager.home-security.uk` (manager UI, PASSWORD-protected API).
+`https://manager.home-security.uk` (manager UI) — both gated by Cloudflare
+Access SSO; the editor additionally requires `PASSWORD` at code-server login.
