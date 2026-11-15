@@ -13,6 +13,12 @@
       "skillPath": "plugins/stitch-build/skills/react-vite-dashboard/SKILL.md",
       "computedHash": "51579332c6abffcbf325e91a63468f4fd44216abc2187ad24ead213fe8f19800"
     },
+    "uv-docker-integration": {
+      "source": "SalmanO7/Full_Stack-Todo_App",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/uv-docker-integration/SKILL.md",
+      "computedHash": "5a332b44722e7198f281d3a506d2951276fea21ef095f4063993c40dabd6d0df"
+    },
     "vite": {
       "source": "antfu/skills",
       "sourceType": "github",

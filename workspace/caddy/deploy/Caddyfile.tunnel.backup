@@ -1,0 +1,77 @@
+{
+	auto_https disable_redirects
+}
+
+https://files.home-security.uk:8443 {
+        bind 127.0.0.1
+        tls internal {
+                protocols tls1.2 tls1.3
+        }
+
+        reverse_proxy 127.0.0.1:5050 {
+                # Prevent backend from leaking its own Server header
+                header_down -Server
+        }
+
+        header {
+                # Existing headers
+                X-Content-Type-Options nosniff
+                Referrer-Policy no-referrer
+                -Server
+
+                # Prevent clickjacking (disallows embedding your file manager in iframes)
+                X-Frame-Options DENY
+
+                # Enforce HTTPS strictly on the browser
+                Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+                # Restrict unneeded browser hardware/API access
+                Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+
+                # Isolate browsing context from cross-origin popups
+                Cross-Origin-Opener-Policy "same-origin"
+        }
+
+# Jarvis voice command bridge - user-facing
+https://jarvis.home-security.uk:8443 {
+	bind 127.0.0.1
+	tls internal {
+		protocols tls1.2 tls1.3
+	}
+
+	reverse_proxy 127.0.0.1:8790 {
+		header_down -Server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+		X-Frame-Options DENY
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb()"
+		Cross-Origin-Opener-Policy "same-origin"
+	}
+}
+
+# Jarvis voice command bridge - API/check endpoint
+https://jarvis-check.home-security.uk:8443 {
+	bind 127.0.0.1
+	tls internal {
+		protocols tls1.2 tls1.3
+	}
+
+	reverse_proxy 127.0.0.1:8790 {
+		header_down -Server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+		X-Frame-Options DENY
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb()"
+		Cross-Origin-Opener-Policy "same-origin"
+	}
+}

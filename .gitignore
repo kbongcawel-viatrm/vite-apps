@@ -161,3 +161,14 @@ vendor/
 # Cloudflare tunnel credentials (never commit)
 **/deploy/cloudflared/credentials.json
 **/deploy/cloudflared/cert.pem
+
+# tv-bridge shared secret
+**/.token
+__pycache__
+**/__pycache__
+
+# jarvis runtime data (job transcripts, listen queue)
+workspace/jarvis/data/
+
+# jarvis poller killswitch (created at runtime to stop the poller)
+workspace/jarvis/control/STOP

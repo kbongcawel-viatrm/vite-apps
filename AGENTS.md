@@ -23,6 +23,22 @@ approval. When in doubt, ask first.
 - `compose.yaml` at repo root — unified podman-compose stack (`vite-apps` project): caddy + cloudflared + dufs
 - `.env` at repo root holds secrets (`TUNNEL_TOKEN`) — never commit it; `workspace/file-manager/.env` holds `FTP_USER`/`FTP_PW`
 
+## Everything runs as a container
+
+**Every per-project process is a compose service — no exceptions.**
+Rationale: manageability (one `podman-compose ps|logs|restart` surface),
+standardization (same lifecycle for every component), portability
+(the stack moves as a unit).
+
+- New daemons/workers/pollers → new service in `compose.yaml`, never
+  `nohup`, `&`, cron, or systemd units on the host
+- Secrets live in gitignored files mounted read-only; runtime state in
+  mounted `data/` dirs — never inside image layers
+- Code that changes often is bind-mounted (`server.py` pattern) so
+  updates need `restart`, not `--build`
+- If a host process already exists for a project, containerize it and
+  retire the host process — unaccounted processes are technical debt
+
 ## Common commands
 
 ```bash
@@ -34,3 +50,13 @@ podman-compose -f compose.yaml up -d --build dufs      # rebuild image
 
 Public URL (Cloudflare Tunnel): `https://files.home-security.uk` — gated by
 Cloudflare Access SSO. No systemd units; everything is compose-managed.
+
+## Public hostnames
+
+Any new public hostname follows the standard pattern in
+`docs/public-hostname.md` — compose service on `127.0.0.1`, tunnel ingress,
+proxied CNAME to the tunnel, and a Cloudflare Access app with the shared
+"Allow home users" policy. CF-side mutations require operator approval.
+
+Security posture and planned hardening (device posture, service tokens,
+JWT decision) are documented in `docs/security-roadmap.md`.

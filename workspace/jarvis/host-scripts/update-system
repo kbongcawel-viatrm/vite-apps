@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs inside jarvis-queue-worker as host uid kim (rootless 1:1 mapping)
+# with the host userland mounted — real ujust, real privileges of kim.
+cd "$HOME" && exec ujust update-system

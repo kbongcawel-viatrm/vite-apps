@@ -1,0 +1,15 @@
+#!/bin/sh
+# Host package update — runs as container-root == host uid kim.
+# ublue hosts use run0 (polkit); falls back to sudo -n if present.
+# Both fail fast without an authentication agent — no TTY for prompts.
+echo "update-all: dnf clean + makecache + upgrade"
+if command -v run0 >/dev/null 2>&1; then
+  PRIV="run0"
+elif command -v sudo >/dev/null 2>&1; then
+  PRIV="sudo -n"
+else
+  echo "no privilege tool (run0/sudo) found"; exit 127
+fi
+$PRIV dnf clean all \
+  && $PRIV dnf makecache \
+  && $PRIV dnf upgrade -y --skip-unavailable

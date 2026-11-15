@@ -1,0 +1,213 @@
+# Unified edge deployment & file-manager stack (rootless Podman)
+#
+# ROOTLESS ONLY: run podman-compose as your normal user — never via sudo.
+#   podman-compose up -d
+#   podman-compose down
+#
+#  New Network flow:
+# ##################################################################################################################################################################################################################
+# |  Container                              │ Listen address      │ Public hostname           │ Notes                                                      │   Run as
+# ├─────────────────────────────────────────┼─────────────────────┼───────────────────────────┼────────────────────────────────────────────────────────────┤────────────────────────────────────────────────────────
+# | vite-apps_dufs_1        (Container)     | 127.0.0.1:5050->5000|  files.home-security.uk   | dufs file manager                                          |  podman-compose -f compose.yaml
+# │ vite-apps_caddy_1       (Container)     │ 127.0.0.1:8443      │  N/A                      │ tls manager and reverse proxy                              │  podman-compose -f compose.yaml 
+# │ vite-apps_cloudflared_1 (Container)     │ N/A                 │  *.home-security.uk       │ CF tunnel                                                  │  podman-compose -f compose.yaml 
+# ##################################################################################################################################################################################################################
+name: vite-apps
+
+services:
+  caddy:
+    image: docker.io/library/caddy:2
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - dufs
+    volumes:
+      - ./workspace/caddy/deploy/Caddyfile.tunnel:/etc/caddy/Caddyfile:ro,Z
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      # Caddy admin API on localhost:2019 proves the process is serving.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # Serves https://127.0.0.1:8443 for ide./manager./files.home-security.uk
+
+  cloudflared:
+    image: docker.io/cloudflare/cloudflared:latest
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - caddy
+    command: tunnel --no-autoupdate run
+    env_file:
+      - ./.env   # repo-root .env containing TUNNEL_TOKEN
+    healthcheck:
+      # Queries the local metrics /ready endpoint; exits non-zero until
+      # the tunnel has registered connections to Cloudflare edge.
+      test: ["CMD", "cloudflared", "tunnel", "ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  dufs:
+    build: ./workspace/file-manager
+    pull_policy: never
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    ports:
+      - "127.0.0.1:5050:5000"
+    # FUSE mount for rclone; SYS_ADMIN is namespaced under rootless podman.
+    devices:
+      - /dev/fuse
+    cap_add:
+      - SYS_ADMIN
+    environment:
+      - FTP_HOST=192.168.2.1
+      - FTP_PORT=21
+    env_file:
+      - ./workspace/file-manager/.env
+    volumes:
+      # Vendored dufs UI assets (adds Access logout link); :Z for SELinux.
+      - ./workspace/file-manager/assets:/assets:ro,Z
+    healthcheck:
+      # dufs serves on :5000 inside the container; TCP connect is enough —
+      # the UI may answer 401/redirect depending on auth config.
+      test: ["CMD", "nc", "-z", "127.0.0.1", "5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  jarvis:
+    build: ./workspace/jarvis
+    pull_policy: never
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+    ports:
+      - "127.0.0.1:8790:8790"
+    volumes:
+      # Allowlisted scripts + shared secret; :Z for SELinux.
+      - ./workspace/jarvis/scripts:/app/scripts:Z
+      - ./workspace/jarvis/host-scripts:/app/host-scripts:ro,Z
+      - ./workspace/jarvis/server.py:/app/server.py:ro,Z
+      - ./workspace/jarvis/.token:/app/.token:ro,Z
+      - ./workspace/jarvis/data:/app/data:Z
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8790/health',timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+   
+  # Executes executor:"host" jobs from the shared data/jobs/ queue.
+  # Host filesystem is bind-mounted at identical paths so allowlisted
+  # host-scripts can run real tooling (ujust, rpm-ostree, systemctl).
+  jarvis-queue-worker:
+    build:
+      context: ./workspace/jarvis-queue-worker
+      dockerfile: Dockerfile
+    image: localhost/jarvis-queue-worker:1.0
+    pull_policy: never
+    restart: unless-stopped
+    # Rootless: container root maps to the host user (kim).
+    user: "0:0"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    environment:
+      HOME: /home/kim
+      JOBS_DIR: /data/jobs
+      HOST_SCRIPTS_DIR: /app/host-scripts
+      POLL_INTERVAL: "2"
+      HOST_TIMEOUT: "3600"
+      HEALTH_FILE: /tmp/worker-health
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - type: bind
+        source: ./workspace/jarvis/data
+        target: /data
+        bind:
+          selinux: Z
+      - type: bind
+        source: ./workspace/jarvis/host-scripts
+        target: /app/host-scripts
+        read_only: true
+        bind:
+          selinux: Z
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+    cpus: 0.25
+    mem_limit: 128m
+    pids_limit: 64
+    healthcheck:
+      test: ["CMD", "/app/src/healthcheck.sh"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    logging:
+      driver: journald
+      options:
+        tag: jarvis-queue-worker
+    stop_signal: SIGTERM
+    stop_grace_period: 20s
+
+  # SSH trigger poller (testing/fallback transport). Pulls ~/triggers/*.req
+  # from the TV over SSH and enqueues into the bridge. Not needed for the
+  # primary voice path (TV pushes via jarvis-check HTTPS) — kept for tests.
+  jarvis_poller:
+    build: ./workspace/jarvis-poller
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      HOME: /home/jarvis
+      BRIDGE_API: http://jarvis:8790
+      HEALTH_FILE: /tmp/poller-health
+      KILLSWITCH_FILE: /control/STOP
+    volumes:
+      - ./workspace/jarvis/poller.py:/app/poller.py:ro,Z
+      - ./workspace/jarvis/.token:/app/.token:ro,Z
+      - ./workspace/jarvis/ssh:/home/jarvis/.ssh:ro,Z
+      # Killswitch: create workspace/jarvis/control/STOP on the host to
+      # stop the poller gracefully (same as `podman stop`, but remote-friendly).
+      - ./workspace/jarvis/control:/control:ro,Z
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,time,sys; p=os.getenv('HEALTH_FILE','/tmp/poller-health'); sys.exit(0 if os.path.exists(p) and time.time()-os.path.getmtime(p)<120 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    logging:
+      driver: journald
+      options:
+        tag: jarvis-poller
+    stop_signal: SIGTERM
+    stop_grace_period: 15s
+
+volumes:
+  caddy_data:
+  caddy_config:

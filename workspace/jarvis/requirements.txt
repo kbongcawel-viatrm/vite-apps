@@ -1,0 +1,8 @@
+# Python dependencies for jarvis server
+# Pin versions for reproducibility and security
+
+# No external dependencies currently needed
+# Python standard library is sufficient
+
+# If adding dependencies in the future, pin versions like:
+# package==1.2.3

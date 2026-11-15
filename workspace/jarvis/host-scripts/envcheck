@@ -1,0 +1,5 @@
+#!/bin/sh
+echo "uid=$(id -u) user=$(id -un)"
+for c in sudo run0 dnf rpm-ostree pkexec; do
+  printf '%-12s %s\n' "$c" "$(command -v $c || echo MISSING)"
+done

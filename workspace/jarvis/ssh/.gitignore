@@ -1,0 +1,4 @@
+# jarvis SSH private key + known_hosts + poller runtime secrets.
+# Never commit — contains credentials. Patterns are relative to this dir.
+*
+!.gitignore
