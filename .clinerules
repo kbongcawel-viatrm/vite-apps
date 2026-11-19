@@ -1,0 +1,7 @@
+# Container creation rules (also in AGENTS.md)
+
+- Always inform the operator before creating a systemd unit or container.
+- All services must run under uid 1000.
+- Containers must use the default userns and default user — no
+  `userns_mode`, `user:`, or `--user` overrides. Under rootless Podman the
+  default mapping already runs container root as host uid 1000.

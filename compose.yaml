@@ -1,4 +1,4 @@
-# Unified edge deployment & file-manager stack (rootless Podman)
+# # Unified edge deployment & file-manager stack (rootless Podman)
 #
 # ROOTLESS ONLY: run podman-compose as your normal user — never via sudo.
 #   podman-compose up -d
@@ -56,7 +56,7 @@ services:
     healthcheck:
       # Queries the local metrics /ready endpoint; exits non-zero until
       # the tunnel has registered connections to Cloudflare edge.
-      test: ["CMD", "cloudflared", "tunnel", "ready"]
+      test: ["CMD", "cloudflared", "--metrics", "127.0.0.1:20241", "tunnel", "ready"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -95,188 +95,213 @@ services:
       retries: 3
       start_period: 10s
 
-  jarvis:
-    build: ./workspace/jarvis
+#  jarvis:
+#    build: ./workspace/jarvis
+#    pull_policy: never
+#    restart: unless-stopped
+#    # SECURITY NOTE: In rootless Podman, container root (uid 0) maps to host user kim.
+#    # This is secure because the host user is unprivileged. The Dockerfile also
+#    # creates a non-root user (jarvis:1000) as a fallback. For additional security,
+#    # consider using user: "1000:1000" but this may break bind mount access.
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.1'
+#          memory: 64M
+#    ports:
+#      - "127.0.0.1:8790:8790"
+#      - "127.0.0.1:8791:8791"
+#    environment:
+#       # SSL/TLS Configuration - DISABLED BY DEFAULT FOR SECURITY
+#       # WARNING: Do NOT enable without proper CA-signed certificates!
+#       SSL_ENABLED: "false"
+#       SSL_CERTFILE: /app/ssl/cert.pem
+#       SSL_KEYFILE: /app/ssl/key.pem
+#       HTTPS_PORT: "8791"
+#       # Job retention policy
+#       MAX_JOB_AGE_HOURS: "24"
+#       MAX_JOBS_TO_KEEP: "1000"
+#       JOB_CLEANUP_INTERVAL: "60"
+#    volumes:
+#      # Allowlisted scripts + shared secret; :Z for SELinux.
+#      # :z (shared) on mounts consumed by multiple containers — :Z gives
+#      # each container a private MCS category and they deny each other.
+#      - ./workspace/jarvis/scripts:/app/scripts:Z
+#      - ./workspace/jarvis/host-scripts:/app/host-scripts:ro,z
+#      - ./workspace/jarvis/server.py:/app/server.py:ro,Z
+#      - ./workspace/jarvis/requirements.txt:/app/requirements.txt:ro,Z
+#      - ./workspace/jarvis/.token:/app/.token:ro,z
+#      - ./workspace/jarvis/data:/app/data:z
+#    healthcheck:
+#      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8790/health',timeout=5)"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#      start_period: 10s
+#   
+#  # Executes executor:"host" jobs from the shared data/jobs/ queue.
+#  # Host filesystem is bind-mounted at identical paths so allowlisted
+#  # host-scripts can run real tooling (ujust, rpm-ostree, systemctl).
+#  jarvis-queue-worker:
+#  build:
+#      context: ./workspace/jarvis-queue-worker
+#      dockerfile: Dockerfile
+#    image: localhost/jarvis-queue-worker:1.0
+#    pull_policy: never
+#    restart: unless-stopped
+#    # Runs the HOST's /usr/bin/python3 (Fedora userland mounted below) so
+#    # host-scripts get real host binaries/libs. Container root maps 1:1 to
+#    # host user kim — same privilege level as a normal login, no escalation.
+#    command: ["/usr/bin/python3", "/app/src/worker.py"]
+#   # SECURITY NOTE: In rootless Podman, container root maps to host user kim.
+#    # This is secure because the host user is unprivileged. Container has
+#   # additional hardening: read_only filesystem, cap_drop ALL, no-new-privileges.
+#  security_opt:
+#       - no-new-privileges:true
+#    cap_drop:
+#      - ALL
+#    read_only: true
+#    environment:
+#      HOME: /home/kim
+#      JOBS_DIR: /data/jobs
+#      HOST_SCRIPTS_DIR: /app/host-scripts
+#     # POLL_INTERVAL: "2"
+#      HOST_TIMEOUT: "3600"
+#      HEALTH_FILE: /tmp/worker-health
+#      PYTHONUNBUFFERED: "1"
+#      PYTHONDONTWRITEBYTECODE: "1"
+#    volumes:
+#      - type: bind
+#        source: ./workspace/jarvis/data
+#        target: /data
+#        bind:
+#          selinux: z
+#      - type: bind
+#        source: ./workspace/jarvis/host-scripts
+#        target: /app/host-scripts
+#        read_only: true
+#        bind:
+#          selinux: z
+#     # worker.py bind-mounted so fixes need only a restart, not a rebuild.
+#      - type: bind
+#        source: ./workspace/jarvis-queue-worker/src/worker.py
+#        target: /app/src/worker.py
+#        read_only: true
+#        bind:
+#          selinux: Z
+#      # Host userland at identical paths so host-scripts run real host
+#      # binaries (ujust, rpm-ostree, systemctl --user) as container-root
+#      # == host uid kim. NO :Z — relabeling host dirs breaks the host's
+#      # own SELinux labels. Read-only where the host doesn't need writes.
+#      - /usr:/usr:ro
+#      - /bin:/bin:ro
+#      - /sbin:/sbin:ro
+#      - /lib:/lib:ro
+#      - /lib64:/lib64:ro
+#      - /etc:/etc
+#      - /ostree:/ostree
+#      - /run/ostree:/run/ostree
+#      - /var/lib/rpm-ostree:/var/lib/rpm-ostree
+#      - /var/lib/flatpak:/var/lib/flatpak
+#      - /run/dbus:/run/dbus
+#      - /run/systemd:/run/systemd:ro
+#      - /home/kim:/home/kim
+#      - /var/tmp:/var/tmp
+#    tmpfs:
+#      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+#    cpus: 0.5
+#    # rpm-ostree/flatpak updates need real headroom — 128m would OOM-kill
+#    # a system update mid-flight.
+#    mem_limit: 1g
+#    pids_limit: 128
+#    healthcheck:
+#      test: ["CMD", "/app/src/healthcheck.sh"]
+#      interval: 30s
+#      timeout: 5s
+#      start_period: 15s
+#      retries: 3
+#    logging:
+#      driver: journald
+#      options:
+#        tag: jarvis-queue-worker
+#    stop_signal: SIGTERM
+#    stop_grace_period: 20s
+#
+#  # SSH trigger poller (testing/fallback transport). Pulls ~/triggers/*.req
+#  # from the TV over SSH and enqueues into the bridge. Not needed for the
+#  # primary voice path (TV pushes via jarvis-check HTTPS) — kept for tests.
+#  jarvis_poller:
+#    build: ./workspace/jarvis-poller
+#    pull_policy: never
+#    restart: unless-stopped
+#    # SECURITY NOTE: In rootless Podman, container root (uid 0) maps to host user kim.
+#    # This is secure because the host user is unprivileged. The Dockerfile also
+#    # creates a non-root user as a fallback. For additional security, consider
+#    # using user: "1000:1000" but this may break bind mount access.
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: "0.25"
+#          memory: 128M
+#    pids_limit: 64
+#    environment:
+#      HOME: /home/jarvis
+#      BRIDGE_API: http://jarvis:8790
+#      HEALTH_FILE: /tmp/poller-health
+#      KILLSWITCH_FILE: /control/STOP
+#      # SSH Configuration (can override defaults from poller.py)
+#      SSH_USER: u0_a71
+#      SSH_HOST: 192.168.2.246
+#      SSH_PORT: "8022"
+#      SSH_CONNECT_TIMEOUT: "8"
+#      SSH_KEY_PATH: /home/jarvis/.ssh/jarvis_ed25519
+#      SSH_KNOWN_HOSTS: /home/jarvis/.ssh/known_hosts
+#      SSH_CONTROL_DIR: /tmp/jarvis-ssh
+#    volumes:
+#      - ./workspace/jarvis/poller.py:/app/poller.py:ro,Z
+#      - ./workspace/jarvis/.token:/app/.token:ro,z
+#      # SSH Configuration: Using environment variables only (no key mounting)
+#      # SSH keys are NOT mounted in the container for security.
+#      # Killswitch: create workspace/jarvis/control/STOP on the host to
+#      # stop the poller gracefully (same as `podman stop`, but remote-friendly).
+#      - ./workspace/jarvis/control:/control:ro,Z
+#    healthcheck:
+#      test: ["CMD", "python", "-c", "import os,time,sys; p=os.getenv('HEALTH_FILE','/tmp/poller-health'); sys.exit(0 if os.path.exists(p) and time.time()-os.path.getmtime(p)<120 else 1)"]
+#      interval: 30s
+#      timeout: 5s
+#      start_period: 15s
+#      retries: 3
+#    logging:
+#      driver: journald
+#      options:
+#        tag: jarvis-poller
+#    stop_signal: SIGTERM
+#    stop_grace_period: 15s
+
+  podman-health:
+    build: ./workspace/podman_health
     pull_policy: never
     restart: unless-stopped
-    # SECURITY NOTE: In rootless Podman, container root (uid 0) maps to host user kim.
-    # This is secure because the host user is unprivileged. The Dockerfile also
-    # creates a non-root user (jarvis:1000) as a fallback. For additional security,
-    # consider using user: "1000:1000" but this may break bind mount access.
     deploy:
       resources:
         limits:
           cpus: '0.1'
           memory: 64M
-    ports:
-      - "127.0.0.1:8790:8790"
-      - "127.0.0.1:8791:8791"
-    environment:
-       # SSL/TLS Configuration - DISABLED BY DEFAULT FOR SECURITY
-       # WARNING: Do NOT enable without proper CA-signed certificates!
-       SSL_ENABLED: "false"
-       SSL_CERTFILE: /app/ssl/cert.pem
-       SSL_KEYFILE: /app/ssl/key.pem
-       HTTPS_PORT: "8791"
-       # Job retention policy
-       MAX_JOB_AGE_HOURS: "24"
-       MAX_JOBS_TO_KEEP: "1000"
-       JOB_CLEANUP_INTERVAL: "60"
+    security_opt:
+      # Unconfined so container_t can connect to the host podman socket
+      # (user_tmp_t) — uid mapping already gives it host uid 1000.
+      - label=disable
     volumes:
-      # Allowlisted scripts + shared secret; :Z for SELinux.
-      # :z (shared) on mounts consumed by multiple containers — :Z gives
-      # each container a private MCS category and they deny each other.
-      - ./workspace/jarvis/scripts:/app/scripts:Z
-      - ./workspace/jarvis/host-scripts:/app/host-scripts:ro,z
-      - ./workspace/jarvis/server.py:/app/server.py:ro,Z
-      - ./workspace/jarvis/requirements.txt:/app/requirements.txt:ro,Z
-      - ./workspace/jarvis/.token:/app/.token:ro,z
-      - ./workspace/jarvis/data:/app/data:z
+      # Host rootless podman socket file: `podman ps` inside sees all
+      # user containers. Mounted as a file, not the dir (dir perms block it).
+      - /run/user/1000/podman/podman.sock:/run/podman.sock
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8790/health',timeout=5)"]
+      # Liveness = the agent script is PID 1's cmdline.
+      test: ["CMD", "python3", "-c", "import sys; sys.exit(0 if b'podman_health' in open('/proc/1/cmdline','rb').read() else 1)"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
       start_period: 10s
-   
-  # Executes executor:"host" jobs from the shared data/jobs/ queue.
-  # Host filesystem is bind-mounted at identical paths so allowlisted
-  # host-scripts can run real tooling (ujust, rpm-ostree, systemctl).
-  jarvis-queue-worker:
-    build:
-      context: ./workspace/jarvis-queue-worker
-      dockerfile: Dockerfile
-    image: localhost/jarvis-queue-worker:1.0
-    pull_policy: never
-    restart: unless-stopped
-    # Runs the HOST's /usr/bin/python3 (Fedora userland mounted below) so
-    # host-scripts get real host binaries/libs. Container root maps 1:1 to
-    # host user kim — same privilege level as a normal login, no escalation.
-    command: ["/usr/bin/python3", "/app/src/worker.py"]
-    # SECURITY NOTE: In rootless Podman, container root maps to host user kim.
-    # This is secure because the host user is unprivileged. Container has
-    # additional hardening: read_only filesystem, cap_drop ALL, no-new-privileges.
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    read_only: true
-    environment:
-      HOME: /home/kim
-      JOBS_DIR: /data/jobs
-      HOST_SCRIPTS_DIR: /app/host-scripts
-      POLL_INTERVAL: "2"
-      HOST_TIMEOUT: "3600"
-      HEALTH_FILE: /tmp/worker-health
-      PYTHONUNBUFFERED: "1"
-      PYTHONDONTWRITEBYTECODE: "1"
-    volumes:
-      - type: bind
-        source: ./workspace/jarvis/data
-        target: /data
-        bind:
-          selinux: z
-      - type: bind
-        source: ./workspace/jarvis/host-scripts
-        target: /app/host-scripts
-        read_only: true
-        bind:
-          selinux: z
-      # worker.py bind-mounted so fixes need only a restart, not a rebuild.
-      - type: bind
-        source: ./workspace/jarvis-queue-worker/src/worker.py
-        target: /app/src/worker.py
-        read_only: true
-        bind:
-          selinux: Z
-      # Host userland at identical paths so host-scripts run real host
-      # binaries (ujust, rpm-ostree, systemctl --user) as container-root
-      # == host uid kim. NO :Z — relabeling host dirs breaks the host's
-      # own SELinux labels. Read-only where the host doesn't need writes.
-      - /usr:/usr:ro
-      - /bin:/bin:ro
-      - /sbin:/sbin:ro
-      - /lib:/lib:ro
-      - /lib64:/lib64:ro
-      - /etc:/etc
-      - /ostree:/ostree
-      - /run/ostree:/run/ostree
-      - /var/lib/rpm-ostree:/var/lib/rpm-ostree
-      - /var/lib/flatpak:/var/lib/flatpak
-      - /run/dbus:/run/dbus
-      - /run/systemd:/run/systemd:ro
-      - /home/kim:/home/kim
-      - /var/tmp:/var/tmp
-    tmpfs:
-      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
-    cpus: 0.5
-    # rpm-ostree/flatpak updates need real headroom — 128m would OOM-kill
-    # a system update mid-flight.
-    mem_limit: 1g
-    pids_limit: 128
-    healthcheck:
-      test: ["CMD", "/app/src/healthcheck.sh"]
-      interval: 30s
-      timeout: 5s
-      start_period: 15s
-      retries: 3
-    logging:
-      driver: journald
-      options:
-        tag: jarvis-queue-worker
-    stop_signal: SIGTERM
-    stop_grace_period: 20s
-
-  # SSH trigger poller (testing/fallback transport). Pulls ~/triggers/*.req
-  # from the TV over SSH and enqueues into the bridge. Not needed for the
-  # primary voice path (TV pushes via jarvis-check HTTPS) — kept for tests.
-  jarvis_poller:
-    build: ./workspace/jarvis-poller
-    pull_policy: never
-    restart: unless-stopped
-    # SECURITY NOTE: In rootless Podman, container root (uid 0) maps to host user kim.
-    # This is secure because the host user is unprivileged. The Dockerfile also
-    # creates a non-root user as a fallback. For additional security, consider
-    # using user: "1000:1000" but this may break bind mount access.
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 128M
-    pids_limit: 64
-    environment:
-      HOME: /home/jarvis
-      BRIDGE_API: http://jarvis:8790
-      HEALTH_FILE: /tmp/poller-health
-      KILLSWITCH_FILE: /control/STOP
-      # SSH Configuration (can override defaults from poller.py)
-      SSH_USER: u0_a71
-      SSH_HOST: 192.168.2.246
-      SSH_PORT: "8022"
-      SSH_CONNECT_TIMEOUT: "8"
-      SSH_KEY_PATH: /home/jarvis/.ssh/jarvis_ed25519
-      SSH_KNOWN_HOSTS: /home/jarvis/.ssh/known_hosts
-      SSH_CONTROL_DIR: /tmp/jarvis-ssh
-    volumes:
-      - ./workspace/jarvis/poller.py:/app/poller.py:ro,Z
-      - ./workspace/jarvis/.token:/app/.token:ro,z
-      # SSH Configuration: Using environment variables only (no key mounting)
-      # SSH keys are NOT mounted in the container for security.
-      # Killswitch: create workspace/jarvis/control/STOP on the host to
-      # stop the poller gracefully (same as `podman stop`, but remote-friendly).
-      - ./workspace/jarvis/control:/control:ro,Z
-    healthcheck:
-      test: ["CMD", "python", "-c", "import os,time,sys; p=os.getenv('HEALTH_FILE','/tmp/poller-health'); sys.exit(0 if os.path.exists(p) and time.time()-os.path.getmtime(p)<120 else 1)"]
-      interval: 30s
-      timeout: 5s
-      start_period: 15s
-      retries: 3
-    logging:
-      driver: journald
-      options:
-        tag: jarvis-poller
-    stop_signal: SIGTERM
-    stop_grace_period: 15s
 
 volumes:
   caddy_data:

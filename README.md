@@ -19,7 +19,7 @@ browser ──> Cloudflare edge (Access SSO)
 ```
 
 - **dufs** runs as container `vite-apps_dufs_1`, publishing `127.0.0.1:5050 → :5000`.
-- Inside the container, `entrypoint.sh` mounts `ftp://192.168.2.1:21` via rclone/FUSE to `/mnt/ftp`, then serves it with dufs.
+- Inside the container, `entrypoint.sh` mounts `ftp://192.168.2.51:21` via rclone/FUSE to `/mnt/ftp`, then serves it with dufs.
 - The dufs UI is vendored in `workspace/file-manager/assets/` — Atom-themed, with a Cloudflare Access logout link.
 - All public traffic is gated solely by **Cloudflare Access** — nothing listens on LAN/public interfaces.
 
@@ -70,7 +70,7 @@ Containers are **rootless only** — run `podman-compose` as your normal user, n
 |---|---|---|
 | `TUNNEL_TOKEN` | — | Cloudflare Tunnel token (compose `cloudflared` service, root `.env`) |
 | `FTP_USER` / `FTP_PW` | — | FTP credentials (`workspace/file-manager/.env`) |
-| `FTP_HOST` / `FTP_PORT` | `192.168.2.1` / `21` | Optional FTP endpoint overrides |
+| `FTP_HOST` / `FTP_PORT` | `192.168.2.51` / `21` | Optional FTP endpoint overrides |
 
 ---
 

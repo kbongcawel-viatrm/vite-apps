@@ -29,14 +29,6 @@ ingress:
       noTLSVerify: true
       httpHostHeader: files.home-security.uk
 
-  # Jarvis voice command bridge (user-facing)
-  - hostname: jarvis.home-security.uk
-    service: http://127.0.0.1:8790
-
-  # Jarvis voice command bridge (API/check endpoint)
-  - hostname: jarvis-check.home-security.uk
-    service: http://127.0.0.1:8790
-
   # Catch-all: anything else gets a 404
   - service: http_status:404
 

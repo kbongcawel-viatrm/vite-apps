@@ -1,9 +1,0 @@
-#!/bin/sh
-echo "== suricata binaries =="
-command -v suricata suricata-update 2>&1
-echo "== packages =="
-rpm -q suricata suricata-update 2>&1 | head -5
-echo "== systemd units =="
-systemctl list-unit-files 2>/dev/null | grep -i suricata | head -5
-ls /etc/suricata/ 2>&1 | head -5
-ls /var/lib/suricata/ 2>&1 | head -5

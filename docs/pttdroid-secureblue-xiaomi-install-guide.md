@@ -115,7 +115,7 @@ Set the values for the actual network before applying firewall rules:
 
 ``` bash
 # Example only: verify the actual home LAN subnet and host address first.
-export LAN_CIDR="192.168.1.0/24"
+export LAN_CIDR="192.168.2.0/24"
 export TV_IP="<XIAOMI_TV_IP>"
 ```
 
@@ -369,10 +369,10 @@ firewall-cmd --get-default-zone
 ```
 
 Set `LAN_CIDR` to the real trusted subnet. The following uses
-`192.168.1.0/24` as an example; change it if the network differs.
+`192.168.2.0/24` as an example; change it if the network differs.
 
 ``` bash
-LAN_CIDR="192.168.1.0/24"
+LAN_CIDR="192.168.2.0/24"
 ZONE="$(firewall-cmd --get-default-zone)"
 
 sudo firewall-cmd --permanent --zone="$ZONE" \
@@ -1105,7 +1105,7 @@ Remove the firewall rule using the same zone and CIDR used during
 installation:
 
 ``` bash
-LAN_CIDR="192.168.1.0/24"
+LAN_CIDR="192.168.2.0/24"
 ZONE="$(firewall-cmd --get-default-zone)"
 
 sudo firewall-cmd --permanent --zone="$ZONE" \

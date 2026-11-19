@@ -18,7 +18,7 @@ approval. When in doubt, ask first.
 
 ## Project layout
 
-- `workspace/file-manager/` — dufs file-manager image (`Dockerfile`, `entrypoint.sh`, `assets/`); mounts `ftp://192.168.2.1:21` via rclone/FUSE
+- `workspace/file-manager/` — dufs file-manager image (`Dockerfile`, `entrypoint.sh`, `assets/`); mounts `ftp://192.168.2.51:21` via rclone/FUSE
 - `workspace/ide/deploy/` — edge configs only: `Caddyfile.tunnel`, `cloudflared/config.yml`
 - `compose.yaml` at repo root — unified podman-compose stack (`vite-apps` project): caddy + cloudflared + dufs
 - `.env` at repo root holds secrets (`TUNNEL_TOKEN`) — never commit it; `workspace/file-manager/.env` holds `FTP_USER`/`FTP_PW`
@@ -60,3 +60,16 @@ proxied CNAME to the tunnel, and a Cloudflare Access app with the shared
 
 Security posture and planned hardening (device posture, service tokens,
 JWT decision) are documented in `docs/security-roadmap.md`.
+
+## Agent rules — process creation
+
+- **Always inform the operator before creating a systemd unit or a container.**
+  State what will be created, where it runs, and how to remove it — then wait
+  for approval.
+- **All services must run under uid 1000.** For containers this means
+  rootless Podman only, and the in-container uid must map to host uid 1000
+  (container `USER 0` under rootless maps to the host user — acceptable;
+  `user: "1000:1000"` maps to a subuid and is NOT the host user).
+- **Containers must use the default userns and default user** — no
+  `userns_mode`, `user:`, or `--user` overrides. Under rootless Podman the
+  default mapping already runs container root as host uid 1000.
