@@ -79,7 +79,7 @@ services:
     cap_add:
       - SYS_ADMIN
     environment:
-      - FTP_HOST=192.168.2.1
+      - FTP_HOST=10.1.29.51
       - FTP_PORT=21
     env_file:
       - ./workspace/file-manager/.env
@@ -251,7 +251,7 @@ services:
 #      KILLSWITCH_FILE: /control/STOP
 #      # SSH Configuration (can override defaults from poller.py)
 #      SSH_USER: u0_a71
-#      SSH_HOST: 192.168.2.246
+#      SSH_HOST: 10.1.29.246
 #      SSH_PORT: "8022"
 #      SSH_CONNECT_TIMEOUT: "8"
 #      SSH_KEY_PATH: /home/jarvis/.ssh/jarvis_ed25519

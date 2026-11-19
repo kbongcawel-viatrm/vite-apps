@@ -89,7 +89,8 @@ def post(target, payload):
         req = urllib.request.Request(
             target,
             data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json",
+                     "User-Agent": "podman-health/1.0"},
             method="POST")
         with urllib.request.urlopen(req, timeout=5) as r:
             return r.status == 200

@@ -18,7 +18,7 @@ approval. When in doubt, ask first.
 
 ## Project layout
 
-- `workspace/file-manager/` — dufs file-manager image (`Dockerfile`, `entrypoint.sh`, `assets/`); mounts `ftp://192.168.2.51:21` via rclone/FUSE
+- `workspace/file-manager/` — dufs file-manager image (`Dockerfile`, `entrypoint.sh`, `assets/`); mounts `ftp://10.1.29.51:21` via rclone/FUSE
 - `workspace/ide/deploy/` — edge configs only: `Caddyfile.tunnel`, `cloudflared/config.yml`
 - `compose.yaml` at repo root — unified podman-compose stack (`vite-apps` project): caddy + cloudflared + dufs
 - `.env` at repo root holds secrets (`TUNNEL_TOKEN`) — never commit it; `workspace/file-manager/.env` holds `FTP_USER`/`FTP_PW`
