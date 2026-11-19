@@ -7,4 +7,4 @@ COPY podman_health.py /app/podman_health.py
 ENV PODMAN_SOCK=/run/podman.sock \
     PYTHONUNBUFFERED=1
 ENTRYPOINT ["python3", "/app/podman_health.py"]
-CMD ["--target", "https://gondar.home-security.uk/ingest", "--interval", "60", "--filter", "vite-apps"]
+CMD ["--target", "http://gondar.home-security.uk:8080/ingest", "--interval", "60", "--filter", "vite-apps"]

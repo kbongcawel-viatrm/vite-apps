@@ -5,7 +5,7 @@ Runs inside the vite-apps podman-health container. Talks to the host's
 rootless Podman REST API over the mounted unix socket (no podman CLI
 needed inside the container), polls every INTERVAL seconds, and POSTs
 each container's health to the dashboard's /ingest endpoint on the
-monitoring host (https://gondar.home-security.uk).
+monitoring host (http://gondar.home-security.uk:8080).
 
 Stdlib only. Safe for low-resource hosts.
 
@@ -14,7 +14,7 @@ Env:
     TARGET_URL    dashboard ingest URL
 
 Usage:
-    python3 podman_health.py --target https://gondar.home-security.uk/ingest \
+    python3 podman_health.py --target http://gondar.home-security.uk:8080/ingest \
         --interval 60 --filter vite-apps
 """
 
@@ -101,7 +101,7 @@ def post(target, payload):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--target", required=True,
-                    help="dashboard ingest URL, e.g. https://gondar.home-security.uk/ingest")
+                    help="dashboard ingest URL, e.g. http://gondar.home-security.uk:8080/ingest")
     ap.add_argument("--interval", type=int, default=60)
     ap.add_argument("--filter", default="",
                     help="only report containers whose name contains this")
