@@ -124,7 +124,7 @@ services:
       start_period: 10s
 
   suricata-cf-block:
-    image: docker.io/jasonish/suricata:latest
+    image: docker.io/jasonish/suricata@sha256:d5a3a1785299ab40918d465e54fedf8e3afeeedba76bb64b0cc74dbc20bda2c3
     pull_policy: never
     network_mode: host
     restart: unless-stopped
