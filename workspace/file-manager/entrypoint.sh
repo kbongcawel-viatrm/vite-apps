@@ -8,7 +8,7 @@ OBSCURED_PW=$(rclone obscure "$FTP_PW")
 
 # Mount ftp://10.1.29.1:21 in the background
 rclone mount :ftp: /mnt/ftp \
-  --ftp-host="${FTP_HOST:-10.1.29.1}" \
+  --ftp-host="${FTP_HOST:-192.168.1.58}" \
   --ftp-port="${FTP_PORT:-21}" \
   --ftp-user="$FTP_USER" \
   --ftp-pass="$OBSCURED_PW" \
