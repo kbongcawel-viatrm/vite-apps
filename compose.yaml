@@ -12,7 +12,11 @@
 # │ vite-apps_caddy_1       (Container)     │ 127.0.0.1:8443      │  N/A                      │ tls manager and reverse proxy                              │  podman-compose -f compose.yaml 
 # │ vite-apps_cloudflared_1 (Container)     │ N/A                 │  *.home-security.uk       │ CF tunnel                                                  │  podman-compose -f compose.yaml 
 # ##################################################################################################################################################################################################################
+
 name: vite-apps
+
+x-podman:
+  in_pod: false
 
 services:
   caddy:
@@ -21,8 +25,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
-          memory: 256M
+          cpus: '0.1'
+          memory: 128M
     network_mode: host
     restart: unless-stopped
     depends_on:
@@ -32,13 +36,11 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     healthcheck:
-      # Caddy admin API on localhost:2019 proves the process is serving.
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-    # Serves https://127.0.0.1:8443 for ide./manager./files.home-security.uk
 
   cloudflared:
     image: docker.io/cloudflare/cloudflared:latest
@@ -54,10 +56,8 @@ services:
       - caddy
     command: tunnel --no-autoupdate run
     env_file:
-      - ./.env   # repo-root .env containing TUNNEL_TOKEN
+      - ./.env
     healthcheck:
-      # Queries the local metrics /ready endpoint; exits non-zero until
-      # the tunnel has registered connections to Cloudflare edge.
       test: ["CMD", "cloudflared", "--metrics", "127.0.0.1:20241", "tunnel", "ready"]
       interval: 30s
       timeout: 10s
@@ -66,9 +66,11 @@ services:
 
   dufs:
     image: localhost/vite-apps_dufs:latest
+    init: true
+    stop_grace_period: 2s
     build:
-       context: ./workspace/file-manager
-       dockerfile: Dockerfile
+      context: ./workspace/file-manager
+      dockerfile: Dockerfile
     pull_policy: never
     restart: unless-stopped
     deploy:
@@ -78,22 +80,18 @@ services:
           memory: 128M
     ports:
       - "127.0.0.1:5050:5000"
-    # FUSE mount for rclone; SYS_ADMIN is namespaced under rootless podman.
     devices:
       - /dev/fuse
     cap_add:
       - SYS_ADMIN
     environment:
-      - FTP_HOST=10.1.29.1
+      - FTP_HOST=192.168.1.58
       - FTP_PORT=21
     env_file:
       - ./workspace/file-manager/.env
     volumes:
-      # Vendored dufs UI assets (adds Access logout link); :Z for SELinux.
       - ./workspace/file-manager/assets:/assets:ro,Z
     healthcheck:
-      # dufs serves on :5000 inside the container; TCP connect is enough —
-      # the UI may answer 401/redirect depending on auth config.
       test: ["CMD", "nc", "-z", "127.0.0.1", "5000"]
       interval: 30s
       timeout: 10s
@@ -102,9 +100,11 @@ services:
 
   podman-health:
     image: localhost/vite-apps_podman-health:latest
+    init: true
+    stop_grace_period: 2s
     build:
-       context: ./workspace/podman-health
-       dockerfile: Dockerfile
+      context: ./workspace/podman-health
+      dockerfile: Dockerfile
     pull_policy: never
     restart: unless-stopped
     deploy:
@@ -113,20 +113,46 @@ services:
           cpus: '0.1'
           memory: 64M
     security_opt:
-      # Unconfined so container_t can connect to the host podman socket
-      # (user_tmp_t) — uid mapping already gives it host uid 1000.
       - label=disable
     volumes:
-      # Host rootless podman socket file: `podman ps` inside sees all
-      # user containers. Mounted as a file, not the dir (dir perms block it).
       - /run/user/1000/podman/podman.sock:/run/podman.sock
     healthcheck:
-      # Liveness = the agent script is PID 1's cmdline.
-      test: ["CMD", "python3", "-c", "import sys; sys.exit(0 if b'podman_health' in open('/proc/1/cmdline','rb').read() else 1)"]
+      test: ["CMD", "python3", "-c", "import glob, os, sys; sys.exit(0 if any(os.path.exists(p) and b'podman_health' in open(p,'rb').read() for p in glob.glob('/proc/[0-9]*/cmdline')) else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  suricata-cf-block:
+    image: docker.io/jasonish/suricata:latest
+    pull_policy: never
+    network_mode: host
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
+    security_opt:
+      - label=disable
+    env_file:
+      - ../suricata-cf/cf.env
+    environment:
+      - IPS_EVE=/logs/suricata-logs/eve.json
+      - IDS_EVE=/logs/suricata-ids-logs/eve.json
+      - STATE_FILE=/var/lib/suricata-cf-block/cf-block-state.json
+    volumes:
+      - ../suricata-cf/suricata-cf-block.py:/opt/suricata-cf-block.py:ro
+      - ../suricata-cf/data:/var/lib/suricata-cf-block
+      - /var/lib/containers/storage/volumes/suricata-logs/_data:/logs/suricata-logs:ro
+      - /var/lib/containers/storage/volumes/suricata-ids-logs/_data:/logs/suricata-ids-logs:ro
+    entrypoint: ["python3", "/opt/suricata-cf-block.py"]
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "suricata-cf-block.py"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
   caddy_data:
